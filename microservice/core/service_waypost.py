@@ -1,26 +1,35 @@
-import sys
-
 import requests
 
-from microservice import settings
+from microservice.core import settings
 
 
 class ServiceWaypost(dict):
     function_storage = {}
 
+    local_services = []
+
     # TODO: obviously this needs to live elsewhere
     local_url = "http://127.0.0.1:5000"
 
-    def __getitem__(self, func):
-        if func in self.function_storage.keys():
-            print("Function %s location already known:" % func)
-            return self.function_storage[func]
+    def register_local_service(self, service_name, func):
+        print("Registering %s as local service:" % service_name)
+        self.function_storage[service_name] = func
+        self.local_services.append(service_name)
+
+    def __getitem__(self, service_name):
+        if service_name in self.function_storage.keys():
+            print("Function %s location already known:" % service_name, self.function_storage[service_name])
+            return self.function_storage[service_name]
 
         if settings.deployment_type == settings.DeploymentType.ZERO:
+            func_name = service_name.split('.')[-1]
+            mod_name = '.'.join(service_name.split('.')[:-1])
+            mod = __import__(mod_name, globals(), locals(), [func_name], 0)
+            func = getattr(mod, func_name)
             service = func
         elif settings.deployment_type == settings.DeploymentType.LOCAL:
-            full_func_name = "%s.%s" % (sys.modules[func.__module__].__name__, func.__name__)
-            uri = "%s/%s" % (self.local_url, full_func_name)
+            # Todo change this to "ask orchestrator where it is"
+            uri = "%s/%s" % (self.local_url, service_name)
 
             print("Service is located at:", uri)
 
@@ -42,5 +51,5 @@ class ServiceWaypost(dict):
         else:
             raise NotImplementedError
 
-        self.function_storage[func] = service
+        self.function_storage[service_name] = service
         return service

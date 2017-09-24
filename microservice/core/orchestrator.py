@@ -1,3 +1,4 @@
+from microservice.core.settings import service_waypost
 
 
 class Orchestrator:

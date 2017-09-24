@@ -1,5 +1,7 @@
 import enum
 
+from microservice.core import service_waypost
+
 
 class DeploymentType(enum.Enum):
     ZERO = "ZERO"
@@ -8,4 +10,5 @@ class DeploymentType(enum.Enum):
 
 
 deployment_type = DeploymentType.LOCAL
-local_services = []
+
+local_waypost = service_waypost.ServiceWaypost()
