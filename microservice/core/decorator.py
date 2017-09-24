@@ -18,7 +18,7 @@ def microservice(func):
             ret_func = func
         else:
             print("Decorating %s as microservice." % func)
-            ret_func = Orchestrator.discover(func)
+            ret_func = Orchestrator().discover(func)
             print("Decorated as %s." % ret_func)
         return ret_func(*args, **kwargs)
     return runtime_discovery
