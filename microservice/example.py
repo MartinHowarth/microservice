@@ -1,5 +1,6 @@
 import atexit
 import subprocess
+import time
 
 DETACHED_PROCESS = 8
 
@@ -24,7 +25,8 @@ def main():
     # orchestrator = subprocess.Popen(orchestrator_cmd)
     print("orchestrator up")
     all_processes.append(orchestrator)
-    input("enter to exit")
+    # Allow time for process to setup/detach fully before we quit.
+    time.sleep(2)
 
 
 if __name__ == "__main__":
