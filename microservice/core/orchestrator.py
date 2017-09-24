@@ -78,13 +78,13 @@ class _Orchestrator:
         self.send_management(service_name, "set_orchestrator", self.uri)
 
     def send_management(self, service_name, action, *args, **kwargs):
-        service_base_uri = self.service_locations[service_name].replace(service_name, '')
-        service_mgmt = '/'.join([service_base_uri, "__management"])
+        service_mgmt = self.service_locations[service_name].replace(service_name, '__management')
         json_data = {
             'action': action,
             '_args': args,
             '_kwargs': kwargs,
         }
+        print("Sending management command to service %s at uri %s:" % (service_name, service_mgmt), json_data)
         requests.get(service_mgmt, json=json_data)
 
 
