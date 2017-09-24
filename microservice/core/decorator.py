@@ -1,3 +1,5 @@
+import sys
+
 from microservice.core.orchestrator import Orchestrator
 from microservice import settings
 
@@ -9,7 +11,9 @@ def microservice(func):
     def runtime_discovery(*args, **kwargs):
         print(settings.local_services)
         print(func.__name__)
-        if func.__name__ in settings.local_services:
+        print(sys.modules[func.__module__].__name__)
+        full_func_name = "%s.%s" % (sys.modules[func.__module__].__name__, func.__name__)
+        if full_func_name in settings.local_services:
             print("This function is being served locally")
             ret_func = func
         else:

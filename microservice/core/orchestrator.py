@@ -7,7 +7,7 @@ from microservice import settings
 
 class Orchestrator:
     # An instance of a MS *is* a resource, so refer to it as a uri.
-    services = defaultdict(lambda: ['http://127.0.0.1:5000/echo_as_dict'])
+    services = defaultdict(lambda: ['http://127.0.0.1:5000/microservice.development.functions.echo_as_dict'])
     # Is actually itself a MS
 
     @classmethod
