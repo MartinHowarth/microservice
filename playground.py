@@ -2,6 +2,7 @@ from microservice.development.functions import echo_as_dict2, echo_as_dict, echo
 from microservice.core.service_waypost import ServiceWaypost
 from microservice.core.orchestrator import Orchestrator
 
+
 if __name__ == "__main__":
     ServiceWaypost.orchestrator_uri = Orchestrator.uri
 
