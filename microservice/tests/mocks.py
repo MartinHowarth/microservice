@@ -2,7 +2,7 @@ from microservice.core.service_waypost import _ServiceWaypost
 
 
 class MockServiceWaypost(_ServiceWaypost):
-    orchestrator_uri = None
+    orchestrator_uri = "http://127.0.0.1:4999/orchestration"
 
     local_url = "http://127.0.0.1:5000"
 

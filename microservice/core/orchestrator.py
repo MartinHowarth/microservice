@@ -1,4 +1,10 @@
+import requests
+import subprocess
+
 from flask import Flask, request, jsonify
+
+
+DETACHED_PROCESS = 8
 
 app = Flask(__name__)
 
@@ -35,19 +41,57 @@ class _Orchestrator:
         - Scaling of microservices
 
     """
+    host = "127.0.0.1"
+    port = 4999
 
+    next_service_port = 5000
     service_locations = {}
 
+    # Not sure if this is even worth keeping.
+    spawned_subprocesses = {}
+
+    @property
+    def uri(self):
+        return "http://%s:%s" % (self.host, self.port)
+
     def locate_service(self, service_name):
-        uri = "%s/%s" % ("http://127.0.0.1:5000", service_name)
-        print("Created uri for service %s:" % service_name, uri)
-        return uri
+        print("Locating service:", service_name)
+        if service_name not in self.service_locations.keys():
+            print("No existing service for %s." % service_name)
+            self.create_instance(service_name)
+        return self.service_locations[service_name]
+
+    def create_instance(self, service_name):
+        uri = "http://%s:%s/%s" % (self.host, self.next_service_port, service_name)
+        service_cmd = "microservice --host %s --port %s --local_services %s" % (
+            self.host, self.next_service_port, service_name)
+        service_cmd = service_cmd.split(' ')
+        self.next_service_port += 1
+
+        print("Spawning new service with cmd:", service_cmd)
+        new_service = subprocess.Popen(service_cmd, creationflags=DETACHED_PROCESS, close_fds=True)
+        self.spawned_subprocesses[service_name] = new_service
+
+        print("New service spawned with uri:", uri)
+        self.service_locations[service_name] = uri
+
+        self.send_management(service_name, "set_orchestrator", self.uri)
+
+    def send_management(self, service_name, action, *args, **kwargs):
+        service_base_uri = self.service_locations[service_name].replace(service_name, '')
+        service_mgmt = '/'.join([service_base_uri, "__management"])
+        json_data = {
+            'action': action,
+            '_args': args,
+            '_kwargs': kwargs,
+        }
+        requests.get(service_mgmt, json=json_data)
 
 
 Orchestrator = _Orchestrator()
 
 
-@app.route("/orchestration")
+@app.route("/")
 def orchestration():
     """
     General interface for the external forces to manage this microservice.
@@ -75,4 +119,4 @@ management_waypost = {
 
 
 def initialise_orchestration():
-    app.run(port=4999)
+    app.run(host=Orchestrator.host, port=Orchestrator.port)

@@ -9,10 +9,7 @@ class DeploymentType(enum.Enum):
 
 
 class _ServiceWaypost:
-    # For now, only a single orchestrator is supported.
-    # If this is None, then we *are* the orchestrator.
-    # orchestrator_uri = None
-    orchestrator_uri = "http://127.0.0.1:4999/orchestration"
+    orchestrator_uri = None
 
     deployment_type = DeploymentType.LOCAL
 
@@ -64,20 +61,7 @@ class _ServiceWaypost:
         self.local_services.append(service_name)
 
     def locate_from_orchestrator(self, service_name):
-        if self.orchestrator_uri is None:
-            # This only exists for testing.
-            return "%s/%s" % ("http://127.0.0.1:5000", service_name)
         return self.ask_orchestrator("locate_service", service_name)
-        # return self.locate_service(service_name)
-        # json_data = {
-        #     'action': 'locate_service',
-        #     'service_name': service_name,
-        # }
-        # ret = requests.get(
-        #     self.orchestrator_uri,
-        #     json=json_data
-        # )
-        # return ret.json()['uri']
 
     def ask_orchestrator(self, action, *args, **kwargs):
         json_data = {

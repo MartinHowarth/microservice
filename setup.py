@@ -52,7 +52,7 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'microservice = microservice:__main__:start_service',
+            'microservice=microservice.__main__:start_service',
         ],
     },
 )

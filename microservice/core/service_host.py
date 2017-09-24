@@ -81,21 +81,20 @@ def receive_service_advertisement(service_name, service_uri):
     ServiceWaypost.add_service_location(service_name, service_uri)
 
 
-# def set_orchestrator(orchestrator_uri):
-#     print("Orchestrator is found at:", orchestrator_uri)
-#     ServiceWaypost.orchestrator_uri = orchestrator_uri
+def set_orchestrator(orchestrator_uri):
+    print("Orchestrator is found at:", orchestrator_uri)
+    ServiceWaypost.orchestrator_uri = orchestrator_uri
 
 
 management_waypost = {
     'add_local_service': add_local_service,
-    # 'locate_service': locate_service,
     'receive_service_advertisement': receive_service_advertisement,
-    # 'set_orchestrator': set_orchestrator,
+    'set_orchestrator': set_orchestrator,
 }
 
 
-def initialise_microservice(services):
+def initialise_microservice(services, host="127.0.0.1", port="5000"):
     for service in services:
         add_local_service(service)
 
-    app.run()
+    app.run(host=host, port=port)
