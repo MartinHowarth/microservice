@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 
-import microservice.core.service_waypost
+from microservice.core.service_waypost import ServiceWaypost
 
 app = Flask(__name__)
 
@@ -41,7 +41,7 @@ def management():
         action = management_json.get('action', None)
         args = management_json.get('_args', [])
         kwargs = management_json.get('_kwargs', {})
-        if action in management_waypost.values():
+        if action in management_waypost.keys():
             result = management_waypost[action](*args, **kwargs)
         else:
             raise InvalidUsage("The requested management action `%s` does not exist." % action)
@@ -50,16 +50,16 @@ def management():
     return jsonify({'_args': result})
 
 
-def add_service(service_name):
+def add_local_service(service_name):
     print("Creating new service of name:", service_name)
 
     # Define the flask app route for this service.
     @app.route('/%s' % service_name, endpoint=service_name)
     def new_service():
         req_json = request.get_json()
-        func_args = req_json.pop('_args')
-        print("here")
-        result = microservice.core.service_waypost.ServiceWaypost.locate(service_name)(*func_args, **req_json)
+        func_args = req_json.get('_args', [])
+        func_kwargs = req_json.get('_kwargs', {})
+        result = ServiceWaypost.locate(service_name)(*func_args, **func_kwargs)
         return jsonify({'_args': result})
 
     # Now expose this function at the global scope so that it persists as a new flask route.
@@ -74,22 +74,28 @@ def add_service(service_name):
     func = getattr(mod, func_name)
     print("Dynamically found module is:", mod)
     print("Dynamically found function is:", func)
-    microservice.core.service_waypost.ServiceWaypost.register_local_service(service_name, func)
+    ServiceWaypost.register_local_service(service_name, func)
 
 
-def set_orchestrator(orchestrator_uri):
-    print("Orchestrator is found at:", orchestrator_uri)
-    microservice.core.service_waypost.ServiceWaypost.orchestrator_uri = orchestrator_uri
+def receive_service_advertisement(service_name, service_uri):
+    ServiceWaypost.add_service_location(service_name, service_uri)
+
+
+# def set_orchestrator(orchestrator_uri):
+#     print("Orchestrator is found at:", orchestrator_uri)
+#     ServiceWaypost.orchestrator_uri = orchestrator_uri
 
 
 management_waypost = {
-    'add_service': add_service,
-    'set_orchestrator': set_orchestrator,
+    'add_local_service': add_local_service,
+    # 'locate_service': locate_service,
+    'receive_service_advertisement': receive_service_advertisement,
+    # 'set_orchestrator': set_orchestrator,
 }
 
 
 def initialise_microservice(services):
     for service in services:
-        add_service(service)
+        add_local_service(service)
 
     app.run()
