@@ -1,6 +1,6 @@
 import sys
 
-from microservice.core.orchestrator import Orchestrator
+from microservice.core.service_waypost import ServiceWaypost
 from microservice import settings
 
 
@@ -18,7 +18,7 @@ def microservice(func):
             ret_func = func
         else:
             print("Decorating %s as microservice." % func)
-            ret_func = Orchestrator().discover(func)
+            ret_func = ServiceWaypost()[func]
             print("Decorated as %s." % ret_func)
         return ret_func(*args, **kwargs)
     return runtime_discovery

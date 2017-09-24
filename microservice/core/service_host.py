@@ -26,3 +26,5 @@ def initialise_microservice():
         new_service.name = service
         globals()[service] = new_service
         print("Created new service:", new_service)
+
+    app.run()
