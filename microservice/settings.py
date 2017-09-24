@@ -8,4 +8,4 @@ class DeploymentType(enum.Enum):
 
 
 deployment_type = DeploymentType.LOCAL
-this_service = None
+local_services = None

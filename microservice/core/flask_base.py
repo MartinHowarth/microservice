@@ -1,7 +1,6 @@
 import json
-from microservice import settings
-settings.this_service = "echo_as_dict"
 from microservice.development import functions
+from microservice import settings
 
 from flask import Flask, request
 app = Flask(__name__)
@@ -33,4 +32,5 @@ def echo_as_dict():
 
 
 if __name__ == "__main__":
+    settings.local_services = ["echo_as_dict"]
     app.run()
