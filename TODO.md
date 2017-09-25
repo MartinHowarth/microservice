@@ -11,6 +11,10 @@ Learn and improve!
 - Add robustness to the MS requests - deal with requests failing, and retry (expecting that the health checker will have recovered it)
     - Deal with orchestrator falling over
     - Deal with death of MS during startup (I think specifically losing connection during connection setup, rather than the connection just being refused)
+- Support multiple orchestrators
+    - Need to healthcheck and respawn each other
+    - Need to share service knowledge (both creation and deletion)
+        - When notified about a service by another orchestrator, add it to quarantine until you can healthcheck it.
 - Add object support
     - Currently this only works for functions
     - Can we make it work for objects too?
