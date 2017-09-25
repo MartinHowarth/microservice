@@ -1,6 +1,8 @@
-## TODO
+# TODO
 
-In no particular order, though somewhat higher priority towards the top
+A set of pretty basic requirements that need implementing.
+Generally aim to implement *something* with the expectation that it could be ripped out easily.
+Learn and improve!
 
 - Automatic test suite
 - Additional testing:
@@ -31,7 +33,7 @@ In no particular order, though somewhat higher priority towards the top
 
 
 # Future improvements
-These mostly need thinking about a *lot*
+These are mostly ideas that need thinking about a *lot*.
 
 ## Better Load Balancing
 I think the current implementation of load balancing will actually serve for a long time - as long as a decent
