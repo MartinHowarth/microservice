@@ -1,6 +1,11 @@
+import copy
 import enum
+import threading
+import time
 import requests
 import subprocess
+
+from requests.exceptions import ConnectionError
 
 from collections import defaultdict
 from flask import Flask, request, jsonify
@@ -59,24 +64,54 @@ class _Orchestrator:
 
     load_balancer_type = LoadBalancerType.CLIENT
 
+    heartbeat_running = False
+    heartbeater = None
+    heartbeat_interval = 1  # seconds between heartbeat to every MS
+
     # Not sure if this is even worth keeping.
     spawned_subprocesses = {}
+
+    def __del__(self):
+        self.stop_heartbeat_checking()
 
     @property
     def uri(self):
         return "http://%s:%s" % (self.host, self.port)
 
+    def send_management(self, uri, action, *args, **kwargs):
+        service_name = uri.split('/')[-1]
+        service_mgmt = uri.replace(service_name, '__management')
+        json_data = {
+            'action': action,
+            '_args': args,
+            '_kwargs': kwargs,
+        }
+        print("Sending management command to service %s at uri %s:" % (service_name, service_mgmt), json_data)
+        try:
+            result = requests.get(service_mgmt, json=json_data)
+        except ConnectionError:
+            # If the management connection fails, then declare the MS as dead
+            # There is no point heartbeating as that also relies on the management connection.
+            self.retire_uri(service_name, uri)
+            result = False
+        return result
+
     def locate_service(self, service_name):
         print("Locating service:", service_name)
-        if service_name not in self.service_locations.keys():
+        if service_name not in self.service_locations.keys() or not self.service_locations[service_name]:
             print("No existing service for %s." % service_name)
             self.create_instance(service_name)
-            self.create_instance(service_name)
-        return {
-            LoadBalancerType.ZERO: [self.service_locations[service_name][0]],
-            LoadBalancerType.ORCHESTRATOR: [next(self.service_locations[service_name])],
-            LoadBalancerType.CLIENT: self.service_locations[service_name],
-        }[self.load_balancer_type]
+
+        if self.load_balancer_type == LoadBalancerType.ZERO:
+            locations = [self.service_locations[service_name][0]]
+        elif self.load_balancer_type == LoadBalancerType.ORCHESTRATOR:
+            locations = [next(self.service_locations[service_name])]
+        elif self.load_balancer_type == LoadBalancerType.CLIENT:
+            locations = self.service_locations[service_name]
+        else:
+            raise NotImplementedError
+        print("Service %s found at:" % service_name, locations)
+        return locations
 
     def create_instance(self, service_name):
         uri = "http://%s:%s/%s" % (self.host, self.next_service_port, service_name)
@@ -94,16 +129,58 @@ class _Orchestrator:
 
         self.send_management(uri, "set_orchestrator", self.uri)
 
-    def send_management(self, uri, action, *args, **kwargs):
-        service_name = uri.split('/')[-1]
-        service_mgmt = uri.replace(service_name, '__management')
-        json_data = {
-            'action': action,
-            '_args': args,
-            '_kwargs': kwargs,
-        }
-        print("Sending management command to service %s at uri %s:" % (service_name, service_mgmt), json_data)
-        requests.get(service_mgmt, json=json_data)
+    def report_service_failure(self, service_name):
+        """
+        An MS has reported a failure - check all the services of that type.
+        :param service_name:
+        :return:
+        """
+        print("Failure report received about service:", service_name)
+        self.heartbeat_service(service_name)
+
+    def start_heartbeat_checking(self):
+        self.heartbeat_running = True
+        self.heartbeater = threading.Thread(target=self.heartbeat_monitor)
+        self.heartbeater.start()
+
+    def stop_heartbeat_checking(self):
+        self.heartbeat_running = False
+        if self.heartbeater:
+            self.heartbeater.join()
+
+    def heartbeat_uri(self, uri):
+        print("Heartbeating:", uri)
+        result = self.send_management(uri, "heartbeat")
+        print("Heartbeating result is:", result)
+        return result
+
+    def heartbeat_service(self, service_name):
+        dead_uris = []
+        for uri in self.service_locations[service_name]:
+            if not self.heartbeat_uri(uri):
+                print("Service %s at uri %s has failed." % (service_name, uri))
+                dead_uris.append(uri)
+        for uri in dead_uris:
+            self.retire_uri(service_name, uri)
+
+    def check_all_heartbeats(self):
+        print("Checking all heartbeats")
+        for service_name in self.service_locations.keys():
+            self.heartbeat_service(service_name)
+
+    def heartbeat_monitor(self):
+        while self.heartbeat_running:
+            self.check_all_heartbeats()
+            time.sleep(self.heartbeat_interval)
+
+    def retire_uri(self, service_name, uri):
+        try:
+            self.service_locations[service_name].remove(uri)
+        except ValueError:
+            # This catch can be required, for example:
+            # If the normal heartbeat is trying to retire the service at the same time as an MS reports a failure
+            # then they can both end up trying to remove the same uri.
+            pass
 
 
 Orchestrator = _Orchestrator()
@@ -133,8 +210,10 @@ def orchestration():
 
 management_waypost = {
     'locate_service': Orchestrator.locate_service,
+    'report_service_failure': Orchestrator.report_service_failure,
 }
 
 
 def initialise_orchestration():
+    Orchestrator.start_heartbeat_checking()
     app.run(host=Orchestrator.host, port=Orchestrator.port)

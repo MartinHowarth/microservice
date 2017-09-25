@@ -1,5 +1,8 @@
-from microservice.core.service_waypost import ServiceWaypost, DeploymentType
 import sys
+
+from requests.exceptions import ConnectionError
+
+from microservice.core.service_waypost import ServiceWaypost, DeploymentType
 
 
 def microservice(func):
@@ -14,7 +17,34 @@ def microservice(func):
             ret_func = func
         else:
             print("Decorating %s as microservice." % func)
-            ret_func = ServiceWaypost.locate(full_func_name)
+            ret_func = robust_service_call(full_func_name)
             print("Decorated as %s." % ret_func)
         return ret_func(*args, **kwargs)
     return runtime_discovery
+
+
+def robust_service_call(service_name):
+    """
+    This causes this MS to think all instances of a service are down if a single one fails, and
+    triggers a request to the orchestrator for a new set of references to the downed service.
+
+    :param service_name:
+    :return:
+    """
+    def robust_call(*args, **kwargs):
+        service_functions = ServiceWaypost.locate(service_name)
+        if ServiceWaypost.deployment_type == DeploymentType.ZERO:
+            return service_functions[0]
+
+        service_function = next(service_functions)
+        try:
+            result = service_function(*args, **kwargs)
+        except ConnectionError:
+            # The service failed, so retire all local knowledge of it.
+            ServiceWaypost.retire_service(service_name)
+
+            # Re-locate the service, and then try and use it.
+            service_function = next(ServiceWaypost.locate(service_name))
+            result = service_function(*args, **kwargs)
+        return result
+    return robust_call

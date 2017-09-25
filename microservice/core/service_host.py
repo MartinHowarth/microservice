@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 
+
+from microservice.core.decorator import robust_service_call
 from microservice.core.service_waypost import ServiceWaypost
 
 app = Flask(__name__)
@@ -59,7 +61,7 @@ def add_local_service(service_name):
         req_json = request.get_json()
         func_args = req_json.get('_args', [])
         func_kwargs = req_json.get('_kwargs', {})
-        result = ServiceWaypost.locate(service_name)(*func_args, **func_kwargs)
+        result = robust_service_call(service_name)(*func_args, **func_kwargs)
         return jsonify({'_args': result})
 
     # Now expose this function at the global scope so that it persists as a new flask route.
@@ -81,15 +83,24 @@ def receive_service_advertisement(service_name, service_uri):
     ServiceWaypost.add_service_location(service_name, service_uri)
 
 
+def receive_service_retirement(service_name, service_uri):
+    ServiceWaypost.remove_service_location(service_name, service_uri)
+
+
 def set_orchestrator(orchestrator_uri):
     print("Orchestrator is found at:", orchestrator_uri)
     ServiceWaypost.orchestrator_uri = orchestrator_uri
+
+
+def heartbeat():
+    return True
 
 
 management_waypost = {
     'add_local_service': add_local_service,
     'receive_service_advertisement': receive_service_advertisement,
     'set_orchestrator': set_orchestrator,
+    'heartbeat': heartbeat,
 }
 
 

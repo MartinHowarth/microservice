@@ -9,6 +9,8 @@ Learn and improve!
     - More complicated import models
     - Interaction with other decorators
 - Add robustness to the MS requests - deal with requests failing, and retry (expecting that the health checker will have recovered it)
+    - Deal with orchestrator falling over
+    - Deal with death of MS during startup (I think specifically losing connection during connection setup, rather than the connection just being refused)
 - Add object support
     - Currently this only works for functions
     - Can we make it work for objects too?
@@ -18,17 +20,16 @@ Learn and improve!
         - MS wrapper around DB
         - RESTful way to represent objects.
             - These objects are stored in the DB, and the uri to refer to them is passed around instead of the object itself.
-- Add health checking
-    - Is it alive? -> recreate
+- Add scaling
     - Add resource usage monitoring
         - If average exceeds 50?% then add another instance (or many, if the usage is sufficiently high?)
         - If average decreases below 30?% then remove an instance
-            - Will need to quiesce if it's tagged as a stateful MS
 - Add support for docker instances, rather than subprocess
     - And/or kubernetes etc.
 - Add support for stateful MS (this is low priority, generally this shouldn't be needed, but there are a few exceptions like rate limiting)
     - Option on the `@microservice` decorator to tag as "stateful" - `@microservice(stateful=True)`
     - Some sort of transaction ID required.
+    - Will need to quiesce on retirement of MS if it's tagged as a stateful MS
 
 
 

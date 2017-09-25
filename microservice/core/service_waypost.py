@@ -22,9 +22,9 @@ class _ServiceWaypost:
     local_services = []
 
     def locate(self, service_name):
-        if service_name in self.service_locations.keys():
+        if service_name in self.service_locations.keys() and len(self.service_locations[service_name]):
             print("Function %s location already known:" % service_name, self.service_locations[service_name])
-            return next(self.service_locations[service_name])
+            return self.service_locations[service_name]
 
         if self.deployment_type == DeploymentType.ZERO:
             func_name = service_name.split('.')[-1]
@@ -39,7 +39,21 @@ class _ServiceWaypost:
         else:
             raise NotImplementedError
 
-        return next(self.service_locations[service_name])
+        # Now that we've located the service, call back to this function to return it.
+        return self.locate(service_name)
+
+    def retire_service(self, service_name):
+        if service_name in self.service_locations.keys():
+            del self.service_locations[service_name]
+
+        self.send_to_orchestrator("report_service_failure",
+                                  service_name)
+
+    def remove_service_location(self, service_name, service_uri):
+        try:
+            self.service_locations[service_name].remove(service_uri)
+        except ValueError:
+            pass
 
     def add_service_location(self, service_name, service_uri):
         print("Service %s is located at:" % service_name, service_uri)
@@ -66,9 +80,9 @@ class _ServiceWaypost:
         self.local_services.append(service_name)
 
     def locate_from_orchestrator(self, service_name):
-        return self.ask_orchestrator("locate_service", service_name)
+        return self.send_to_orchestrator("locate_service", service_name)
 
-    def ask_orchestrator(self, action, *args, **kwargs):
+    def send_to_orchestrator(self, action, *args, **kwargs):
         json_data = {
             'action': action,
             '_args': args,
