@@ -5,10 +5,10 @@ import time
 DETACHED_PROCESS = 8
 
 orchestrator_cmd = "microservice --orchestrator".split(' ')
-echos_cmd = "microservice --local_services microservice.development.functions.echo_as_dict,microservice.development.functions.echo_as_dict2".split(' ')
 all_processes = []
 
 
+# TODO: This doesn't actually work by default on windows because we don't have permission to kill the detached processes
 @atexit.register
 def kill_subprocesses():
     for proc in all_processes:

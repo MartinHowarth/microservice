@@ -1,7 +1,11 @@
+import enum
 import requests
 import subprocess
 
+from collections import defaultdict
 from flask import Flask, request, jsonify
+
+from microservice.core.load_balancer import LocalLoadBalancer
 
 
 DETACHED_PROCESS = 8
@@ -32,6 +36,12 @@ def handle_invalid_usage(error):
     return response
 
 
+class LoadBalancerType(enum.Enum):
+    ZERO = "ZERO"
+    ORCHESTRATOR = "ORCHESTRATOR"
+    CLIENT = "CLIENT"
+
+
 class _Orchestrator:
     """
     This is a microservice that provides function to other microservices of:
@@ -45,7 +55,9 @@ class _Orchestrator:
     port = 4999
 
     next_service_port = 5000
-    service_locations = {}
+    service_locations = defaultdict(LocalLoadBalancer)
+
+    load_balancer_type = LoadBalancerType.CLIENT
 
     # Not sure if this is even worth keeping.
     spawned_subprocesses = {}
@@ -59,7 +71,12 @@ class _Orchestrator:
         if service_name not in self.service_locations.keys():
             print("No existing service for %s." % service_name)
             self.create_instance(service_name)
-        return self.service_locations[service_name]
+            self.create_instance(service_name)
+        return {
+            LoadBalancerType.ZERO: [self.service_locations[service_name][0]],
+            LoadBalancerType.ORCHESTRATOR: [next(self.service_locations[service_name])],
+            LoadBalancerType.CLIENT: self.service_locations[service_name],
+        }[self.load_balancer_type]
 
     def create_instance(self, service_name):
         uri = "http://%s:%s/%s" % (self.host, self.next_service_port, service_name)
@@ -73,12 +90,13 @@ class _Orchestrator:
         self.spawned_subprocesses[service_name] = new_service
 
         print("New service spawned with uri:", uri)
-        self.service_locations[service_name] = uri
+        self.service_locations[service_name].append(uri)
 
-        self.send_management(service_name, "set_orchestrator", self.uri)
+        self.send_management(uri, "set_orchestrator", self.uri)
 
-    def send_management(self, service_name, action, *args, **kwargs):
-        service_mgmt = self.service_locations[service_name].replace(service_name, '__management')
+    def send_management(self, uri, action, *args, **kwargs):
+        service_name = uri.split('/')[-1]
+        service_mgmt = uri.replace(service_name, '__management')
         json_data = {
             'action': action,
             '_args': args,
