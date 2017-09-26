@@ -7,7 +7,7 @@ class _HealthChecker:
     @property
     def heartbeat_response(self):
         return {
-            'percent_idle': self.percent_idle,
+            "percent_idle": self.percent_idle,
         }
 
     @property
@@ -52,7 +52,6 @@ class _TimeBasedHealthChecker(_HealthChecker):
                 total += self._percent_idle
                 time.sleep(self.stats_interval)
             self.avg_percent_idle = total / (self.stats_roll_period / self.stats_interval)
-            print("Average percent idle is:", self.avg_percent_idle)
 
 
 HealthChecker = _TimeBasedHealthChecker()

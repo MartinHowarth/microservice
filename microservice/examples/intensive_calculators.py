@@ -23,3 +23,8 @@ def intensive_calculation_1(size):
 @microservice
 def intensive_calculation_2(size):
     return sum_random_list(size)
+
+
+@microservice
+def intensive_calculation_3(size):
+    return intensive_calculation_2(size)

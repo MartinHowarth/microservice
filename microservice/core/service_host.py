@@ -1,3 +1,5 @@
+import sys
+
 from flask import Flask, request, jsonify
 
 
@@ -81,27 +83,35 @@ def add_local_service(service_name):
 
 
 def receive_service_advertisement(service_name, service_uri):
-    ServiceWaypost.add_service_location(service_name, service_uri)
+    ServiceWaypost.add_service_provider(service_name, service_uri)
 
 
 def receive_service_retirement(service_name, service_uri):
-    ServiceWaypost.remove_service_location(service_name, service_uri)
+    ServiceWaypost.remove_service_provider(service_name, service_uri)
 
 
-def set_orchestrator(orchestrator_uri):
+def receive_orchestrator_info(orchestrator_uri, local_uri):
     print("Orchestrator is found at:", orchestrator_uri)
     ServiceWaypost.orchestrator_uri = orchestrator_uri
+    ServiceWaypost.local_uri = local_uri
 
 
 def heartbeat():
     return HealthChecker.heartbeat_response
 
 
+def shut_down(quiesce=True):
+    # TODO once we add threading then quiesce will need to be implemented.
+    sys.exit()
+
+
 management_waypost = {
     'add_local_service': add_local_service,
     'receive_service_advertisement': receive_service_advertisement,
-    'set_orchestrator': set_orchestrator,
+    'receive_service_retirement': receive_service_retirement,
+    'receive_orchestrator_info': receive_orchestrator_info,
     'heartbeat': heartbeat,
+    'shut_down': shut_down,
 }
 
 

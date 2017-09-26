@@ -32,11 +32,12 @@ def robust_service_call(service_name):
     :return:
     """
     def robust_call(*args, **kwargs):
-        service_functions = ServiceWaypost.locate(service_name)
+        service_uris = ServiceWaypost.locate(service_name)
         if ServiceWaypost.deployment_type == DeploymentType.ZERO:
-            return service_functions[0]
+            return ServiceWaypost.service_functions[service_uris[0]]
 
-        service_function = next(service_functions)
+        service_uri = next(service_uris)
+        service_function = ServiceWaypost.service_functions[service_uri]
         try:
             result = service_function(*args, **kwargs)
         except ConnectionError:
@@ -44,7 +45,8 @@ def robust_service_call(service_name):
             ServiceWaypost.retire_service(service_name)
 
             # Re-locate the service, and then try and use it.
-            service_function = next(ServiceWaypost.locate(service_name))
+            service_uri = next(ServiceWaypost.locate(service_name))
+            service_function = ServiceWaypost.service_functions[service_uri]
             result = service_function(*args, **kwargs)
         return result
     return robust_call
