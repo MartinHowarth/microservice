@@ -35,6 +35,7 @@ Learn and improve!
     - Some sort of transaction ID required.
     - Will need to quiesce on retirement of MS if it's tagged as a stateful MS
 
+- Look into replacing the HTTP interconnection between MS's with ZeroMQ - sounds like it'll be faster/better/stronger
 
 
 # Future improvements
@@ -59,3 +60,20 @@ Future ideas include:
  - Docker swarm
  - kubernetes something?
  - ??
+
+
+## Performance!
+### Better options for parallel processing within each microservice
+Current (or, at least, at time of writing) implementation uses a local pool of workers from the python `threading`
+module. There are better alternatives:
+
+- uWSGI (linux only)
+    - Listens on given port (either HTTP or custom protocol uwsgi (yes, same name, sigh) which is better performance)
+    - Farms out requrests to N processes x M threads of a single-threaded flask app
+    - comes with stats!
+    - More performant
+- gunicorn
+- gevent
+
+
+

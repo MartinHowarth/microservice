@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 
 
 from microservice.core.decorator import robust_service_call
+from microservice.core.health_checker import HealthChecker
 from microservice.core.service_waypost import ServiceWaypost
 
 app = Flask(__name__)
@@ -93,7 +94,7 @@ def set_orchestrator(orchestrator_uri):
 
 
 def heartbeat():
-    return True
+    return HealthChecker.heartbeat_response
 
 
 management_waypost = {

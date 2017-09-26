@@ -88,7 +88,7 @@ class _Orchestrator:
         }
         print("Sending management command to service %s at uri %s:" % (service_name, service_mgmt), json_data)
         try:
-            result = requests.get(service_mgmt, json=json_data)
+            result = requests.get(service_mgmt, json=json_data).json()['_args']
         except ConnectionError:
             # If the management connection fails, then declare the MS as dead
             # There is no point heartbeating as that also relies on the management connection.
@@ -156,7 +156,8 @@ class _Orchestrator:
 
     def heartbeat_service(self, service_name):
         dead_uris = []
-        for uri in self.service_locations[service_name]:
+        # Cast to list to perform a copy operation so no one can change the list under our feet.
+        for uri in list(self.service_locations[service_name]):
             if not self.heartbeat_uri(uri):
                 print("Service %s at uri %s has failed." % (service_name, uri))
                 dead_uris.append(uri)
@@ -165,7 +166,8 @@ class _Orchestrator:
 
     def check_all_heartbeats(self):
         print("Checking all heartbeats")
-        for service_name in self.service_locations.keys():
+        # Cast to list to perform a copy operation so no one can change the list under our feet.
+        for service_name in list(self.service_locations.keys()):
             self.heartbeat_service(service_name)
 
     def heartbeat_monitor(self):
