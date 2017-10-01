@@ -68,7 +68,6 @@ class HeartBeater:
                 self.congested_services.append(service_name)
 
     def check_all_heartbeats(self):
-        print("Checking all heartbeats")
         # Cast to list to perform a copy operation so no one can change the list under our feet.
         for service_name in list(self.orchestrator.service_providers.keys()):
             self.heartbeat_service(service_name)

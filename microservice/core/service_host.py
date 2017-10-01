@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 
 from microservice.core.decorator import robust_service_call
 from microservice.core.health_checker import HealthChecker
-from microservice.core.service_waypost import ServiceWaypost
+from microservice.core import settings
 
 app = Flask(__name__)
 
@@ -79,21 +79,21 @@ def add_local_service(service_name):
     func = getattr(mod, func_name)
     print("Dynamically found module is:", mod)
     print("Dynamically found function is:", func)
-    ServiceWaypost.register_local_service(service_name, func)
+    settings.ServiceWaypost.register_local_service(service_name, func)
 
 
 def receive_service_advertisement(service_name, service_uri):
-    ServiceWaypost.add_service_provider(service_name, service_uri)
+    settings.ServiceWaypost.add_service_provider(service_name, service_uri)
 
 
 def receive_service_retirement(service_name, service_uri):
-    ServiceWaypost.remove_service_provider(service_name, service_uri)
+    settings.ServiceWaypost.remove_service_provider(service_name, service_uri)
 
 
 def receive_orchestrator_info(orchestrator_uri, local_uri):
     print("Orchestrator is found at:", orchestrator_uri)
-    ServiceWaypost.orchestrator_uri = orchestrator_uri
-    ServiceWaypost.local_uri = local_uri
+    settings.ServiceWaypost.orchestrator_uri = orchestrator_uri
+    settings.ServiceWaypost.local_uri = local_uri
 
 
 def heartbeat():
@@ -116,6 +116,8 @@ management_waypost = {
 
 
 def initialise_microservice(services, host="127.0.0.1", port="5000"):
+    from microservice.core.service_waypost import init_service_waypost
+    init_service_waypost()
     for service in services:
         add_local_service(service)
 

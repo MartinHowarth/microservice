@@ -1,14 +1,17 @@
 import enum
-import requests
 import subprocess
+import sys
 
 from requests.exceptions import ConnectionError
 
 from collections import defaultdict
 from flask import Flask, request, jsonify
 
+from microservice.core.communication import send_to_uri
 from microservice.core.heartbeater import HeartBeater
 from microservice.core.load_balancer import LocalLoadBalancer
+from microservice.core import pubsub
+from microservice.core import settings
 
 
 DETACHED_PROCESS = 8
@@ -57,6 +60,8 @@ class _Orchestrator:
     host = "127.0.0.1"
     port = 4999
 
+    pub_sub_name = 'microservice.core.pubsub._send_to_pubsub'
+
     next_service_port = 5000
     service_providers = defaultdict(LocalLoadBalancer)  # Dict of {service_name: list(uris who provide it)}
     service_consumers = defaultdict(list)  # Dict of {service_name: list(uris who consume it)}
@@ -80,16 +85,8 @@ class _Orchestrator:
         print("Send management:", uri, action, args, kwargs)
         service_name = uri.split('/')[-1]
         service_mgmt = uri.replace(service_name, '__management')
-        json_data = {
-            'action': action,
-            '_args': args,
-            '_kwargs': kwargs,
-        }
-        print("Sending management command to service %s at uri %s:" % (service_name, service_mgmt), json_data)
         try:
-            result = requests.get(service_mgmt, json=json_data)
-            if result:
-                result = result.json()['_args']
+            result = send_to_uri(service_mgmt, __action=action, *args, **kwargs)
         except ConnectionError:
             # If the management connection fails, then declare the MS as dead
             # There is no point heartbeating as that also relies on the management connection.
@@ -98,10 +95,10 @@ class _Orchestrator:
         return result
 
     def locate_provider(self, service_name, consumer):
-        # If an existing consumer of a service is asking for a provider, then we must assume that they know nothing and
-        # therefore treat them as a new consumer - so purge them from the consumer records for the requested service.
-        if consumer in self.service_consumers[service_name]:
-            self.service_consumers[service_name].remove(consumer)
+        # # If an existing consumer of a service is asking for a provider, then we must assume that they know nothing and
+        # # therefore treat them as a new consumer - so purge them from the consumer records for the requested service.
+        # if consumer in self.service_consumers[service_name]:
+        #     self.service_consumers[service_name].remove(consumer)
 
         print("Locating service %s for consumer:" % service_name, consumer)
         if service_name not in self.service_providers.keys() or not self.service_providers[service_name]:
@@ -117,8 +114,8 @@ class _Orchestrator:
         else:
             raise NotImplementedError
         print("Service %s provided by:" % service_name, providers)
-        if consumer:
-            self.service_consumers[service_name].append(consumer)
+        # if consumer:
+        #     self.service_consumers[service_name].append(consumer)
         return providers
 
     def create_instance(self, service_name):
@@ -129,6 +126,7 @@ class _Orchestrator:
         self.next_service_port += 1
 
         print("Spawning new service with cmd:", service_cmd)
+        print(subprocess.Popen, subprocess.Popen.__dict__)
         new_service = subprocess.Popen(service_cmd, creationflags=DETACHED_PROCESS, close_fds=True)
         self.spawned_subprocesses[service_name] = new_service
 
@@ -136,7 +134,7 @@ class _Orchestrator:
         self.service_providers[service_name].append(uri)
 
         self.send_management(uri, "receive_orchestrator_info", self.uri, uri)
-        self.notify_consumers(service_name, uri)
+        pubsub.publish(service_name, uri, __action='receive_service_advertisement')
 
     def destroy_instance(self, service_name, uri):
         print("Shutting down instance:", uri)
@@ -167,25 +165,29 @@ class _Orchestrator:
         # TODO: this should be able to work with just the URI - i.e. shouldn't have to specify the service_name.
         try:
             self.service_providers[service_name].remove(uri)
-            for service in list(self.service_consumers.keys()):
-                if uri in self.service_consumers[service]:
-                    self.service_consumers[service].remove(uri)
-            print("consumers:", self.service_consumers[service_name])
-            self.notify_consumers(service_name, uri, retired=True)
+            # for service in list(self.service_consumers.keys()):
+            #     if uri in self.service_consumers[service]:
+            #         self.service_consumers[service].remove(uri)
+            # print("consumers:", self.service_consumers[service_name])
+            pubsub.publish(service_name, uri, __action='receive_service_retirement')
+            # self.notify_consumers(service_name, uri, retired=True)
         except ValueError:
             # This catch can be required, for example:
             # If the normal heartbeat is trying to retire the service at the same time as an MS reports a failure
             # then they can both end up trying to remove the same uri.
             pass
 
-    def notify_consumers(self, service_name, uri, retired=False):
-        print("Notifying consumers about:", service_name, uri, retired)
-        consumers = self.service_consumers[service_name]
-        for consumer in consumers:
-            if retired:
-                self.send_management(consumer, 'receive_service_retirement', service_name, uri)
-            else:
-                self.send_management(consumer, 'receive_service_advertisement', service_name, uri)
+    # def notify_consumers(self, service_name, uri, retired=False):
+    #     print("Notifying consumers about:", service_name, uri, retired)
+        # if service_name == self.pub_sub_name:
+        #     print("Not notifying about pubsub service")
+        #     return
+        # consumers = self.service_consumers[service_name]
+        # for consumer in consumers:
+        #     if retired:
+        #         self.send_management(consumer, 'receive_service_retirement', service_name, uri)
+        #     else:
+        #         self.send_management(consumer, 'receive_service_advertisement', service_name, uri)
 
 
 Orchestrator = _Orchestrator()
@@ -198,6 +200,7 @@ def orchestration():
 
     This is the interface that the Orchestrator uses.
     """
+    print("Received request:", request)
     management_json = request.get_json()
     if management_json:
         print("Received management request:", management_json)
@@ -220,5 +223,10 @@ management_waypost = {
 
 
 def initialise_orchestration():
+    from microservice.core.service_waypost import init_service_waypost
+    init_service_waypost()
+
     Orchestrator.start()
-    app.run(host=Orchestrator.host, port=Orchestrator.port)
+    settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
+    print("Starting orchestrator on:", Orchestrator.uri)
+    app.run(host=Orchestrator.host, port=Orchestrator.port, threaded=True)

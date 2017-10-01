@@ -27,6 +27,7 @@ def main():
     all_processes.append(orchestrator)
     # Allow time for process to setup/detach fully before we quit.
     time.sleep(2)
+    # input("exit?")
 
 
 if __name__ == "__main__":

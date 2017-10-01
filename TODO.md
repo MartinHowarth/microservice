@@ -8,7 +8,36 @@ Learn and improve!
 - Additional testing:
     - More complicated import models
     - Interaction with other decorators
-- Add robustness to the MS requests - deal with requests failing, and retry (expecting that the health checker will have recovered it)
+- Improve healthchecking:
+    - all MS should publish their status every N seconds.
+    - orchestrators subscribe to heartbeat notifications
+    - when MS dies, it updates it's heartbeat about that too.
+    - Deal with the case where a service is too congested to send a heartbeat in a timely manner
+        - probably want to put non-responsive MS's in a quarantine for N time until they either start responding, or we declare them dead
+- Split out the consumer/provider subscriptions from the orchestrator so that we can support e.g. crossbar to provide that service later
+    - I think it works as follows:
+        - MS_A -> O "Can has MS_B please"
+        - O -> MS_A "here is all the MS_B's"
+        - MS_A <stores those MS_B's>
+        - MS_A <spins off thread to do:
+            - MS_A -> S "I would like updates about MS_B please"
+            >
+        - MS_A -> MS_B "do work please" (as normal)
+        And then the standard "pub" part of the subpub:
+        ...
+        - MS_B1 dies
+        - O healthchecks "he's ded doc"
+        - O -> S "yo dawg, MS_B1 ded"
+        - S -> MS_A "RIP: MS_B1"
+        ...
+        - MS_B2 created
+        - O -> S "sup, we got a new friend called MS_B2, he does MS_B for a living"
+        - S -> MS_A "please start sending work to MS_B2 as well"
+        ...
+        - MS_A dies
+        - S notices somehow? Or is told by O
+
+- Add (more) robustness to the MS requests - deal with requests failing, and retry (expecting that the health checker will have recovered it)
     - Deal with orchestrator falling over
     - Deal with death of MS during startup (I think specifically losing connection during connection setup, rather than the connection just being refused)
 - Support multiple orchestrators
@@ -65,7 +94,7 @@ module. There are better alternatives:
 
 - uWSGI (linux only)
     - Listens on given port (either HTTP or custom protocol uwsgi (yes, same name, sigh) which is better performance)
-    - Farms out requrests to N processes x M threads of a single-threaded flask app
+    - Farms out requests to N processes x M threads of a single-threaded flask app
     - comes with stats!
     - More performant
 - gunicorn

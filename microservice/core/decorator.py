@@ -2,7 +2,7 @@ import sys
 
 from requests.exceptions import ConnectionError
 
-from microservice.core.service_waypost import ServiceWaypost, DeploymentType
+from microservice.core import settings
 
 
 def microservice(func):
@@ -12,7 +12,8 @@ def microservice(func):
     def runtime_discovery(*args, **kwargs):
         full_func_name = "%s.%s" % (sys.modules[func.__module__].__name__, func.__name__)
         print("Function being discovered is:", full_func_name)
-        if full_func_name in ServiceWaypost.local_services or ServiceWaypost.deployment_type == DeploymentType.ZERO:
+        if (full_func_name in settings.ServiceWaypost.local_services or
+                settings.deployment_type == settings.DeploymentType.ZERO):
             print("This function is being served locally")
             ret_func = func
         else:
@@ -32,21 +33,21 @@ def robust_service_call(service_name):
     :return:
     """
     def robust_call(*args, **kwargs):
-        service_uris = ServiceWaypost.locate(service_name)
-        if ServiceWaypost.deployment_type == DeploymentType.ZERO:
-            return ServiceWaypost.service_functions[service_uris[0]]
+        service_uris = settings.ServiceWaypost.locate(service_name)
+        if settings.deployment_type == settings.DeploymentType.ZERO:
+            return settings.ServiceWaypost.service_functions[service_uris[0]]
 
         service_uri = next(service_uris)
-        service_function = ServiceWaypost.service_functions[service_uri]
+        service_function = settings.ServiceWaypost.service_functions[service_uri]
         try:
             result = service_function(*args, **kwargs)
         except ConnectionError:
             # The service failed, so retire all local knowledge of it.
-            ServiceWaypost.retire_service(service_name)
+            settings.ServiceWaypost.retire_service(service_name)
 
             # Re-locate the service, and then try and use it.
-            service_uri = next(ServiceWaypost.locate(service_name))
-            service_function = ServiceWaypost.service_functions[service_uri]
+            service_uri = next(settings.ServiceWaypost.locate(service_name))
+            service_function = settings.ServiceWaypost.service_functions[service_uri]
             result = service_function(*args, **kwargs)
         return result
     return robust_call

@@ -1,15 +1,9 @@
-import enum
-import requests
-
 from collections import defaultdict
 
+from microservice.core.communication import send_to_uri
 from microservice.core.load_balancer import LocalLoadBalancer
-
-
-class DeploymentType(enum.Enum):
-    ZERO = "ZERO"
-    LOCAL = "LOCAL"
-    DOCKER = "DOCKER"
+from microservice.core import pubsub
+from microservice.core import settings
 
 
 class _ServiceWaypost:
@@ -17,26 +11,33 @@ class _ServiceWaypost:
 
     local_uri = None
 
-    deployment_type = DeploymentType.LOCAL
-
     service_providers = defaultdict(LocalLoadBalancer)
     service_functions = dict()
 
     local_services = []
 
     def locate(self, service_name):
+        """
+        Locate the microservices that provide the service specified by `service_name`.
+
+        If the service has been previously used then the local cache of services is returned.
+        If the service is not known, then the orchestrator is queried to find the locations.
+
+        :param str service_name: The name of the service to locate.
+        :return LocalLoadBalancer: The list of uri's that provide the requested service. Wrapped up as a
+            LocalLoadBalancer object for ease of use.
+        """
         if service_name in self.service_providers.keys() and len(self.service_providers[service_name]):
             print("Function %s provider already known:" % service_name, self.service_providers[service_name])
             return self.service_providers[service_name]
-            # return self.service_functions[self.service_providers[service_name]]
 
-        if self.deployment_type == DeploymentType.ZERO:
+        if settings.deployment_type == settings.DeploymentType.ZERO:
             func_name = service_name.split('.')[-1]
             mod_name = '.'.join(service_name.split('.')[:-1])
             mod = __import__(mod_name, globals(), locals(), [func_name], 0)
             func = getattr(mod, func_name)
             self.register_local_service(service_name, func)
-        elif self.deployment_type == DeploymentType.LOCAL:
+        elif settings.deployment_type == settings.DeploymentType.LOCAL:
             service_uris = self.locate_from_orchestrator(service_name)
             for uri in service_uris:
                 self.add_service_provider(service_name, uri)
@@ -47,6 +48,13 @@ class _ServiceWaypost:
         return self.locate(service_name)
 
     def retire_service(self, service_name):
+        """
+        Forget that a service exists. Remove all local knowledge of it.
+
+        One use case is to trigger a re-request to the orchestrator for this service next time that it is used.
+
+        :param str service_name: Name of the service to retire.
+        """
         if service_name in self.service_providers.keys():
             uris = self.service_providers[service_name]
             for uri in uris:
@@ -57,6 +65,12 @@ class _ServiceWaypost:
                                   service_name)
 
     def remove_service_provider(self, service_name, service_uri):
+        """
+        Forget that a particular instance of a service exists.
+
+        :param str service_name: Name of the service to forget.
+        :param str service_uri: The URI of the specific instance to forget about.
+        """
         print("Service providers are:", self.service_providers[service_name])
         try:
             self.service_providers[service_name].remove(service_uri)
@@ -64,48 +78,67 @@ class _ServiceWaypost:
             pass
 
     def add_service_provider(self, service_name, service_uri):
+        """
+        Learn about a particular instance of a service.
+
+        This creates the wrapper function for how to contact this instance later.
+
+        :param str service_name: Name of the service for which an instance is being added.
+        :param str service_uri: The URI of the specific instance being learned about
+        """
         print("Service %s is provided by:" % service_name, service_uri)
+        # Subscribe to new service after defining it locally so we don't tight loop on subscribing
+        # to the pubsub service.
+        is_new_service = True if service_name not in self.service_providers else False
 
         # Wrapper to call the uri (i.e. remote function)
         def ms_function(*args, **kwargs):
-            json_data = {
-                '_args': args,
-                '_kwargs': kwargs,
-            }
-            ret = requests.get(
-                service_uri,
-                json=json_data
-            )
-            print("Remote service returned json:", ret.json())
-            # Functions can't return kwargs, so only return args.
-            return ret.json()['_args']
+            result = send_to_uri(service_uri, *args, **kwargs)
+            return result
 
         self.service_providers[service_name].append(service_uri)
         self.service_functions[service_uri] = ms_function
 
+        if is_new_service:
+            print("Subscribing to service:", service_name)
+            pubsub.subscribe(service_name, self.local_uri)
+
     def register_local_service(self, service_name, func):
+        """
+        Register a service of given name to be a local service.
+        This means that when trying to locate this service we won't query the orchestrator and we'll just call the
+        function.
+
+        :param str service_name: Name of the service to register as locally provided.
+        :param function func: The actual local function to register.
+        """
         print("Registering %s as local service:" % service_name)
-        uri = "local%s" % func
+        uri = "__local__.%s" % func
         self.service_providers[service_name].append(uri)
         self.service_functions[uri] = func
         self.local_services.append(service_name)
 
     def locate_from_orchestrator(self, service_name):
+        """
+        Ask the orchestrator for the locations (URIs) of microservices that serve the given `service_name`.
+
+        :param str service_name: Name of the service to locate.
+        :return list[str]: List of URI's.
+        """
         return self.send_to_orchestrator("locate_provider", service_name, self.local_uri)
 
     def send_to_orchestrator(self, action, *args, **kwargs):
-        json_data = {
-            'action': action,
-            '_args': args,
-            '_kwargs': kwargs
-        }
-        print("Asking orchestrator for:", json_data)
-        ret = requests.get(
-            self.orchestrator_uri,
-            json=json_data
-        )
-        print("Received:", ret)
-        return ret.json()['_args']
+        """
+        Helper function to send any request to the orchestrator.
+
+        :param str action: Action to trigger on the orchestrator. See the `management_waypost` in orchestrator.py.
+        :param args: Args to send with the request.
+        :param kwargs: Kwargs to send with the request.
+        :return: Whatever the orchestrator returns.
+        """
+        result = send_to_uri(self.orchestrator_uri, *args, __action=action, **kwargs)
+        return result
 
 
-ServiceWaypost = _ServiceWaypost()
+def init_service_waypost():
+    settings.ServiceWaypost = _ServiceWaypost()

@@ -1,6 +1,6 @@
 import argparse
 
-from microservice.core import service_host, orchestrator
+from microservice.core import settings
 
 
 def start_service():
@@ -12,12 +12,15 @@ def start_service():
     args = parser.parse_args()
 
     if args.orchestrator:
+        settings.this_is_orchestrator = True
+        from microservice.core import orchestrator
         orchestrator.initialise_orchestration()
     else:
         services = args.local_services.split(',')
         print("This instance is providing the following services:")
         for service in services:
             print("\t", service)
+        from microservice.core import service_host
         service_host.initialise_microservice(services, args.host, args.port)
 
 
