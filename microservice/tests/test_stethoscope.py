@@ -11,9 +11,6 @@ from microservice.core.stethoscope import _Stethoscope
 
 class TestStethoscope(TestCase):
     def setUp(self):
-        # # Start the orchestrator
-        # quickstart_orchestrator.main(disable_healthchecking=True)
-
         # Start the local service waypost
         init_service_waypost(disable_heartbeating=True)
         settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
