@@ -3,7 +3,7 @@ import requests
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 
-from microservice.core.communication import send_to_uri
+from microservice.core.communication import send_to_uri, send_to_mgmt_of_uri
 
 
 class MockRequestResult(MagicMock):
@@ -55,3 +55,23 @@ class TestCommunication(TestCase):
         with self.subTest(msg="Test parsing response"):
             result = send_to_uri(uri, *args, **kwargs)
             self.assertEqual(result, MockRequestResult().json()['_args'])
+
+    def test_send_to_mgmt_of_uri(self):
+        args = (5, 6, 7)
+        kwargs = {
+            'apple': "tasty",
+            'banana': "loaf",
+        }
+        uri = "http://127.0.0.1:5000/test"
+        mgmt_uri = "http://127.0.0.1:5000/__management"
+        action = "test_action"
+        send_to_mgmt_of_uri(uri, *args, __action=action, **kwargs)
+
+        json_data = {
+            '_args': args,
+            '_kwargs': kwargs,
+            'action': action,
+        }
+        self.mocked_requests_get.assert_has_calls([
+            call(mgmt_uri, json=json_data),
+        ])

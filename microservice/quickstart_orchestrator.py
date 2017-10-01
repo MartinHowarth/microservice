@@ -1,4 +1,5 @@
 import atexit
+import json
 import subprocess
 import time
 
@@ -16,8 +17,16 @@ def kill_subprocesses():
         proc.kill()
 
 
-def main():
+def main(**kwargs):
     print("starting")
+
+    print("Additional kwargs are:", kwargs)
+
+    json_kwargs = json.dumps(kwargs)
+    orchestrator_cmd.extend(['--other_kwargs', json_kwargs])
+
+    print("command is:", orchestrator_cmd)
+
     # The DETACHED_PROCESS option means we no longer have authority to kill it again by default. However, it is the
     # only option as it creates entirely detached subprocesses which is required for robustness/scaling/nice things.
     # orchestrator = subprocess.Popen(orchestrator_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

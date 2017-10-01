@@ -62,6 +62,7 @@ def add_local_service(service_name):
     @app.route('/%s' % service_name, endpoint=service_name)
     def new_service():
         req_json = request.get_json()
+        print("Service %s received request info:" % service_name, req_json)
         func_args = req_json.get('_args', [])
         func_kwargs = req_json.get('_kwargs', {})
         result = robust_service_call(service_name)(*func_args, **func_kwargs)
@@ -96,13 +97,23 @@ def receive_orchestrator_info(orchestrator_uri, local_uri):
     settings.ServiceWaypost.local_uri = local_uri
 
 
+def current_deployment_information():
+    return settings.ServiceWaypost.current_deployment_information()
+
+
 def heartbeat():
     return HealthChecker.heartbeat_response
 
 
 def shut_down(quiesce=True):
-    # TODO once we add threading then quiesce will need to be implemented.
-    sys.exit()
+    # Quiesce is always true with this implementation.
+    def shutdown_server():
+        func = request.environ.get('werkzeug.server.shutdown')
+        if func is None:
+            raise RuntimeError('Not running with the Werkzeug Server')
+        func()
+    shutdown_server()
+    print("Shutting down server!!!")
 
 
 management_waypost = {
@@ -112,13 +123,14 @@ management_waypost = {
     'receive_orchestrator_info': receive_orchestrator_info,
     'heartbeat': heartbeat,
     'shut_down': shut_down,
+    'current_deployment_information': current_deployment_information,
 }
 
 
-def initialise_microservice(services, host="127.0.0.1", port="5000"):
+def initialise_microservice(services, host="127.0.0.1", port="5000", **kwargs):
     from microservice.core.service_waypost import init_service_waypost
     init_service_waypost()
     for service in services:
         add_local_service(service)
 
-    app.run(host=host, port=port)
+    app.run(host=host, port=port, threaded=True)

@@ -39,6 +39,9 @@ def robust_service_call(service_name):
 
         service_uri = next(service_uris)
         service_function = settings.ServiceWaypost.service_functions[service_uri]
+
+        print("Calling %s with args:" % service_name, args, kwargs)
+
         try:
             result = service_function(*args, **kwargs)
         except ConnectionError:

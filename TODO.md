@@ -36,7 +36,12 @@ Learn and improve!
         ...
         - MS_A dies
         - S notices somehow? Or is told by O
-
+- Deal with many concurrent requests better
+    - E.g. imagine a function loop that calls into itself 1000 times before completing
+    - We'd need 1000 handlers for that microservice
+    - which right now, requires 1000 threads, of which (at the end) 999 of them are just blocking on another one)
+    - Move to some sort of worker pool model? non-blocking requests to other microservices
+        - ?????
 - Add (more) robustness to the MS requests - deal with requests failing, and retry (expecting that the health checker will have recovered it)
     - Deal with orchestrator falling over
     - Deal with death of MS during startup (I think specifically losing connection during connection setup, rather than the connection just being refused)

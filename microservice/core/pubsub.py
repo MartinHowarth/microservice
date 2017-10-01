@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from microservice.core.communication import send_to_uri
+from microservice.core.communication import send_to_mgmt_of_uri
 from microservice.core.decorator import microservice
 
 
@@ -30,10 +30,9 @@ class _PubSub:
         print("Consumers of this event type are:", self.consumers[event_type])
         for consumer in self.consumers[event_type]:
             self.notify_consumer(consumer, *args, **kwargs)
-            # TODO this bit: test that publishing is working!
 
     def notify_consumer(self, consumer, *args, **kwargs):
-        result = send_to_uri(consumer, *args, **kwargs)
+        result = send_to_mgmt_of_uri(consumer, *args, **kwargs)
 
 
 PubSub = _PubSub()

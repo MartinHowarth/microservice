@@ -92,8 +92,12 @@ class TestPubSubHelpers(TestCase):
         }
 
         pubsub.publish("event_1", *args, **kwargs)
+        pubsub.publish("service_name", "http://127.0.0.1:5000/test", __action='receive_service_advertisement')
 
-        self.mocked_handle_publish.assert_has_calls([call("event_1", *args, **kwargs)])
+        self.mocked_handle_publish.assert_has_calls([
+            call("event_1", *args, **kwargs),
+            call("service_name", "http://127.0.0.1:5000/test", __action='receive_service_advertisement')
+        ])
 
     def test_subscribe(self):
         pubsub.subscribe("event_1", "consumer_1")

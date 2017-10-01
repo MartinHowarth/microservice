@@ -78,7 +78,7 @@ class HeartBeater:
 
         # Retire any uncontactable (and therefore as good as dead) services.
         for service_definition in self.dead_uris:
-            self.orchestrator.retire_uri(service_definition.service_name, service_definition.uri)
+            self.orchestrator.retire_uri(service_definition.uri)
         self.dead_uris = []
 
         # Scale down too-idle services to conserve resources.

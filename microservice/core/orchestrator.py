@@ -1,15 +1,18 @@
 import enum
 import subprocess
 import sys
+import threading
+import time
 
 from requests.exceptions import ConnectionError
 
 from collections import defaultdict
 from flask import Flask, request, jsonify
 
-from microservice.core.communication import send_to_uri
+from microservice.core.communication import send_to_mgmt_of_uri
 from microservice.core.heartbeater import HeartBeater
 from microservice.core.load_balancer import LocalLoadBalancer
+from microservice.core.service_functions import service_uri_information
 from microservice.core import pubsub
 from microservice.core import settings
 
@@ -60,22 +63,55 @@ class _Orchestrator:
     host = "127.0.0.1"
     port = 4999
 
-    pub_sub_name = 'microservice.core.pubsub._send_to_pubsub'
-
     next_service_port = 5000
     service_providers = defaultdict(LocalLoadBalancer)  # Dict of {service_name: list(uris who provide it)}
-    service_consumers = defaultdict(list)  # Dict of {service_name: list(uris who consume it)}
+    # service_consumers = defaultdict(list)  # Dict of {service_name: list(uris who consume it)}
 
     load_balancer_type = LoadBalancerType.CLIENT
 
     # Not sure if this is even worth keeping.
     spawned_subprocesses = {}
 
+    create_heartbeater = True
     heartbeater = None
 
+    to_publish_queue = []
+    publisher_thread = None
+    publish_interval = 0.1
+
+    running = True
+
     def start(self):
-        self.heartbeater = HeartBeater(self)
-        self.heartbeater.start_heartbeat_checking()
+        self.running = True
+
+        self.publisher_thread = threading.Thread(target=self.send_publishes)
+        self.publisher_thread.start()
+
+        if self.create_heartbeater:
+            self.heartbeater = HeartBeater(self)
+            self.heartbeater.start_heartbeat_checking()
+
+    def send_publishes(self):
+        while self.running:
+            while self.to_publish_queue:
+                # Take from the front of the queue.
+                publish = self.to_publish_queue.pop(0)
+                print("Actually publishing:", publish)
+                pubsub.publish(*publish['args'], **publish['kwargs'])
+            time.sleep(self.publish_interval)
+
+    def queue_for_publishing(self, *args, **kwargs):
+        """
+        Queue events for publishing. This is Async because then we can respond to the immediate query that caused
+        the need for the publish, then actually publish the information.
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        self.to_publish_queue.append({
+            'args': args,
+            'kwargs': kwargs
+        })
 
     @property
     def uri(self):
@@ -83,14 +119,12 @@ class _Orchestrator:
 
     def send_management(self, uri, action, *args, **kwargs):
         print("Send management:", uri, action, args, kwargs)
-        service_name = uri.split('/')[-1]
-        service_mgmt = uri.replace(service_name, '__management')
         try:
-            result = send_to_uri(service_mgmt, __action=action, *args, **kwargs)
+            result = send_to_mgmt_of_uri(uri, __action=action, *args, **kwargs)
         except ConnectionError:
             # If the management connection fails, then declare the MS as dead
             # There is no point heartbeating as that also relies on the management connection.
-            self.retire_uri(service_name, uri)
+            self.retire_uri(uri)
             result = False
         return result
 
@@ -126,7 +160,6 @@ class _Orchestrator:
         self.next_service_port += 1
 
         print("Spawning new service with cmd:", service_cmd)
-        print(subprocess.Popen, subprocess.Popen.__dict__)
         new_service = subprocess.Popen(service_cmd, creationflags=DETACHED_PROCESS, close_fds=True)
         self.spawned_subprocesses[service_name] = new_service
 
@@ -134,19 +167,20 @@ class _Orchestrator:
         self.service_providers[service_name].append(uri)
 
         self.send_management(uri, "receive_orchestrator_info", self.uri, uri)
-        pubsub.publish(service_name, uri, __action='receive_service_advertisement')
+        self.queue_for_publishing(service_name, service_name, uri, __action='receive_service_advertisement')
+        # pubsub.publish(service_name, uri, __action='receive_service_advertisement')
 
-    def destroy_instance(self, service_name, uri):
+    def destroy_instance(self, uri):
         print("Shutting down instance:", uri)
         self.send_management(uri, "shut_down")
-        self.retire_uri(service_name, uri)
+        self.retire_uri(uri)
 
     def scale_down(self, service_name):
         # Always leave at least one instance of each service up.
         if len(self.service_providers[service_name]) > 1:
             print("Scaling down service:", service_name)
             uri = self.service_providers[service_name][0]  # Kill the first one created. It's unlucky for some reason.
-            self.destroy_instance(service_name, uri)
+            self.destroy_instance(uri)
 
     def scale_up(self, service_name):
         print("Scaling up service:", service_name)
@@ -161,21 +195,29 @@ class _Orchestrator:
         print("Failure report received about service:", service_name)
         self.heartbeater.heartbeat_service(service_name)
 
-    def retire_uri(self, service_name, uri):
-        # TODO: this should be able to work with just the URI - i.e. shouldn't have to specify the service_name.
+    def retire_uri(self, uri):
+        service_name = service_uri_information(uri).service_name
         try:
             self.service_providers[service_name].remove(uri)
             # for service in list(self.service_consumers.keys()):
             #     if uri in self.service_consumers[service]:
             #         self.service_consumers[service].remove(uri)
             # print("consumers:", self.service_consumers[service_name])
-            pubsub.publish(service_name, uri, __action='receive_service_retirement')
+            self.queue_for_publishing(service_name, service_name, uri, __action='receive_service_retirement')
+            # pubsub.publish(service_name, uri, __action='receive_service_retirement')
             # self.notify_consumers(service_name, uri, retired=True)
         except ValueError:
             # This catch can be required, for example:
             # If the normal heartbeat is trying to retire the service at the same time as an MS reports a failure
             # then they can both end up trying to remove the same uri.
             pass
+
+    def current_deployment_information(self):
+        info = {
+            'service_providers': self.service_providers,
+        }
+        print("current_deployment_information is:", info)
+        return info
 
     # def notify_consumers(self, service_name, uri, retired=False):
     #     print("Notifying consumers about:", service_name, uri, retired)
@@ -193,7 +235,7 @@ class _Orchestrator:
 Orchestrator = _Orchestrator()
 
 
-@app.route("/")
+@app.route("/__management")
 def orchestration():
     """
     General interface for the external forces to manage this microservice.
@@ -210,7 +252,12 @@ def orchestration():
         if action in management_waypost.keys():
             result = management_waypost[action](*args, **kwargs)
         else:
-            raise InvalidUsage("The requested management action `%s` does not exist." % action)
+            if action.startswith('__TEST__'):
+                # Expose all functions so they cna be triggered by a test function.
+                func = getattr(Orchestrator, action[len('__TEST__'):])
+                result = func(*args, **kwargs)
+            else:
+                raise InvalidUsage("The requested management action `%s` does not exist." % action)
     else:
         raise InvalidUsage("There was no json included in the management request.")
     return jsonify({'_args': result})
@@ -219,13 +266,15 @@ def orchestration():
 management_waypost = {
     'locate_provider': Orchestrator.locate_provider,
     'report_service_failure': Orchestrator.report_service_failure,
+    'current_deployment_information': Orchestrator.current_deployment_information,
 }
 
 
-def initialise_orchestration():
+def initialise_orchestration(create_heartbeater=True, **kwargs):
     from microservice.core.service_waypost import init_service_waypost
     init_service_waypost()
 
+    Orchestrator.create_heartbeater = create_heartbeater
     Orchestrator.start()
     settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
     print("Starting orchestrator on:", Orchestrator.uri)

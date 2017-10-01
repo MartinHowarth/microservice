@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from microservice.core.communication import send_to_uri
+from microservice.core.communication import send_to_mgmt_of_uri, send_to_uri
 from microservice.core.load_balancer import LocalLoadBalancer
 from microservice.core import pubsub
 from microservice.core import settings
@@ -96,10 +96,14 @@ class _ServiceWaypost:
             result = send_to_uri(service_uri, *args, **kwargs)
             return result
 
-        self.service_providers[service_name].append(service_uri)
-        self.service_functions[service_uri] = ms_function
+        # Don't add the service if we already know about it
+        if service_uri not in self.service_providers[service_name]:
+            self.service_providers[service_name].append(service_uri)
+            self.service_functions[service_uri] = ms_function
 
-        if is_new_service:
+        if is_new_service and self.local_uri:
+            # Don't subscribe if local uri is None. Local uri is only none when we're running as a non-MS instance,
+            # for instance, as a unit test.
             print("Subscribing to service:", service_name)
             pubsub.subscribe(service_name, self.local_uri)
 
@@ -136,8 +140,13 @@ class _ServiceWaypost:
         :param kwargs: Kwargs to send with the request.
         :return: Whatever the orchestrator returns.
         """
-        result = send_to_uri(self.orchestrator_uri, *args, __action=action, **kwargs)
+        result = send_to_mgmt_of_uri(self.orchestrator_uri, *args, __action=action, **kwargs)
         return result
+
+    def current_deployment_information(self):
+        return {
+            'service_providers': self.service_providers,
+        }
 
 
 def init_service_waypost():
