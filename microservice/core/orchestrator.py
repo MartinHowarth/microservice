@@ -181,8 +181,8 @@ class _Orchestrator:
         self.retire_uri(uri)
 
     def scale_down(self, service_name, pct_idle=None):
-        # Always leave at least one instance of each service up.
-        if len(self.service_providers[service_name]) > 1:
+        # TODO allow user config of "always keep N instances of X up"
+        if len(self.service_providers[service_name]):
             print("Scaling down service:", service_name)
             uri = self.service_providers[service_name][0]  # Kill the first one created. It's unlucky for some reason.
             self.destroy_instance(uri)

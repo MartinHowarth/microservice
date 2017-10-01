@@ -72,7 +72,9 @@ class _Stethoscope:
                 avg_idle = sum(idle_pcts) / len(idle_pcts)
                 print("Average idle of service %s is:" % service_name, avg_idle)
                 if avg_idle > self.percent_idle_high_threshold and len(idle_pcts) > 1:
-                    # Don't mark as idle if there is only one instance of the service.
+                    # Don't mark as idle if there is only one instance of the service, otherwise "at rest" we will
+                    # always attempt to scale down.
+                    # TODO allow user config of "always keep N instances of X up"
                     self.idle_services.add(ServiceIdle(service_name, avg_idle))
                 if avg_idle < self.percent_idle_low_threshold:
                     print("Service %s is congested!" % service_name)

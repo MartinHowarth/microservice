@@ -236,3 +236,41 @@ class TestOrchestratorCreationAndDeletion(TestCase):
                     'microservice.tests.microservices_for_testing.echo_as_dict2': 1,
                     'microservice.core.pubsub._send_to_pubsub': 1,
                 })
+
+        msg = "Test that scaling up works"
+        with self.subTest(msg=msg):
+            self.call_on_orchestrator('scale_up', "microservice.tests.microservices_for_testing.echo_as_dict")
+
+            self.assertServicesExist(msg, {
+                'microservice.core.pubsub._send_to_pubsub': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict': 3,
+                'microservice.tests.microservices_for_testing.echo_as_dict2': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict3': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict4': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict5': 1,
+            })
+
+        msg = "Test that scaling works"
+        with self.subTest(msg=msg):
+            self.call_on_orchestrator('scale_down', "microservice.tests.microservices_for_testing.echo_as_dict")
+
+            self.assertServicesExist(msg, {
+                'microservice.core.pubsub._send_to_pubsub': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict': 2,
+                'microservice.tests.microservices_for_testing.echo_as_dict2': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict3': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict4': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict5': 1,
+            })
+            self.call_on_orchestrator('scale_down', "microservice.tests.microservices_for_testing.echo_as_dict")
+            self.call_on_orchestrator('scale_down', "microservice.tests.microservices_for_testing.echo_as_dict")
+            self.call_on_orchestrator('scale_down', "microservice.tests.microservices_for_testing.echo_as_dict")
+
+            self.assertServicesExist(msg, {
+                'microservice.core.pubsub._send_to_pubsub': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict': 0,
+                'microservice.tests.microservices_for_testing.echo_as_dict2': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict3': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict4': 1,
+                'microservice.tests.microservices_for_testing.echo_as_dict5': 1,
+            })
