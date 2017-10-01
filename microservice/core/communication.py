@@ -14,6 +14,7 @@ def send_to_uri(uri, *args, additional_json=None, **kwargs):
     result = requests.get(uri, json=json_data)
     if result:
         result = result.json()['_args']
+    print("Got result:", result)
     return result
 
 

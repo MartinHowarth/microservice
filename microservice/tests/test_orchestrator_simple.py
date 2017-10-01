@@ -13,7 +13,7 @@ class TestOrchestratorSimple(TestCase):
     This covers testing that the orchestrator's basic functions work, i.e. on the scale of creating single instances.
     """
     def setUp(self):
-        init_service_waypost()
+        init_service_waypost(disable_heartbeating=True)
         settings.deployment_type = settings.DeploymentType.ZERO
 
     @patch("microservice.core.orchestrator.send_to_mgmt_of_uri")

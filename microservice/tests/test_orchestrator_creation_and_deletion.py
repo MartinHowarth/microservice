@@ -21,7 +21,7 @@ class TestOrchestratorCreationAndDeletion(TestCase):
         quickstart_orchestrator.main(disable_healthchecking=True)
 
         # Start the local service waypost
-        init_service_waypost()
+        init_service_waypost(disable_heartbeating=True)
         settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
 
     def call_on_orchestrator(self, action, *args, **kwargs):

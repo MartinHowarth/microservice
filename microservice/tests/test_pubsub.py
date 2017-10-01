@@ -8,7 +8,7 @@ from microservice.core.service_waypost import init_service_waypost
 
 class TestPubSub(TestCase):
     def setUp(self):
-        init_service_waypost()
+        init_service_waypost(disable_heartbeating=True)
         settings.deployment_type = settings.DeploymentType.ZERO
 
         self.original_notify_consumer = PubSub.notify_consumer
@@ -69,7 +69,7 @@ class TestPubSub(TestCase):
 
 class TestPubSubHelpers(TestCase):
     def setUp(self):
-        init_service_waypost()
+        init_service_waypost(disable_heartbeating=True)
         settings.deployment_type = settings.DeploymentType.ZERO
 
         self.original_handle_publish = PubSub.handle_publish

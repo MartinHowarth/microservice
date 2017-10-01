@@ -8,7 +8,7 @@ from microservice.core import service_host
 
 class TestServiceHost(TestCase):
     def setUp(self):
-        init_service_waypost()
+        init_service_waypost(disable_heartbeating=True)
         settings.deployment_type = settings.DeploymentType.ZERO
 
     def test_test_override(self):

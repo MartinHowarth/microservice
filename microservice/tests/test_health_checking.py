@@ -17,8 +17,7 @@ from microservice.tests.microservices_for_testing import (
 class TestHealthChecking(TestCase):
     def setUp(self):
         # Start the orchestrator
-        # Disable the heartbeater so we have more control over starting and stopping instances reliably.
-        quickstart_orchestrator.main(create_heartbeater=False)
+        quickstart_orchestrator.main()
 
         # Start the local service waypost
         init_service_waypost()

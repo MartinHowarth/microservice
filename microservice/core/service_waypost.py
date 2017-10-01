@@ -28,14 +28,17 @@ class _ServiceWaypost:
 
     def start(self, disable_heartbeating=None, **kwargs):
         if disable_heartbeating is not None:
+            print("Heartbeat disabled.")
             self._disable_heartbeating = disable_heartbeating
 
         if not self._disable_heartbeating:
             self._heartbeat = threading.Thread(target=self.heartbeat)
+            self._heartbeat.start()
 
         self.running = True
 
     def heartbeat(self):
+        print("Heartbeat started.")
         while self.running:
             time.sleep(self.heartbeat_interval)
             notify_stethoscope(self.local_uri, HealthChecker.heartbeat_info)

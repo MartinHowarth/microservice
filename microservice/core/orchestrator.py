@@ -289,11 +289,14 @@ management_waypost = {
 }
 
 
-def initialise_orchestration(**kwargs):
+def initialise_orchestration(disable_healthchecking=None, **kwargs):
     from microservice.core.service_waypost import init_service_waypost
-    init_service_waypost()
+    init_service_waypost(disable_heartbeating=disable_healthchecking)
 
-    Orchestrator.start(**kwargs)
+    Orchestrator.start(disable_healthchecking=disable_healthchecking, **kwargs)
     settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
+    # For now just set the local uri to be ORCHESTRATOR so that we can distinguish in the logs (otherwise it's None)
+    # This will need changing when orchestrator robustness is developed.
+    settings.ServiceWaypost.local_uri = '/'.join((Orchestrator.uri, "ORCHESTRATOR"))
     print("Starting orchestrator on:", Orchestrator.uri)
     app.run(host=Orchestrator.host, port=Orchestrator.port, threaded=True)

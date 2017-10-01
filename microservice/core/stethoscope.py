@@ -11,11 +11,11 @@ ServiceIdle = namedtuple("ServiceIdle", ['service_name', 'avg_idle'])
 
 
 class _Stethoscope:
-    congested_services = []
-    idle_services = []
-    dead_uris = []
-    suspect_uris = []
-    unknown_uris = []
+    congested_services = set()
+    idle_services = set()
+    dead_uris = set()
+    suspect_uris = set()
+    unknown_uris = set()
 
     uri_status = dict()
 
@@ -38,10 +38,13 @@ class _Stethoscope:
         self._orchestrator_talker.start()
 
     def receive_heartbeat(self, originating_uri, heartbeat_info):
+        if not originating_uri:
+            return
+
         if originating_uri not in self.uri_status.keys():
             # If it doesn't exist, then it's either new; or an old MS that's recovered. Ask the orchestrator to find out
             # In the second case, we want to tell the orchestrator about it.
-            self.suspect_uris.append(originating_uri)
+            self.suspect_uris.add(originating_uri)
 
         heartbeat_info.update({
             'received_time': time.time()
@@ -56,49 +59,54 @@ class _Stethoscope:
             for uri, info in self.uri_status.items():
                 # Check if the last received heartbeat was too old.
                 if current_time - info['received_time'] > self.heartbeat_timeout:
-                    self.dead_uris.append(uri)
+                    self.dead_uris.add(uri)
+                    print("Dead heartbeat for:", uri)
                     continue
                 uri_info = service_uri_information(uri)
                 idle_by_service[uri_info.service_name].append(info['percent_idle'])
 
+            for dead_uri in self.dead_uris:
+                del self.uri_status[dead_uri]
+
             for service_name, idle_pcts in idle_by_service.items():
                 avg_idle = sum(idle_pcts) / len(idle_pcts)
                 print("Average idle of service %s is:" % service_name, avg_idle)
-                if avg_idle > self.percent_idle_high_threshold:
-                    self.idle_services.append(ServiceIdle(service_name, avg_idle))
+                if avg_idle > self.percent_idle_high_threshold and len(idle_pcts) > 1:
+                    # Don't mark as idle if there is only one instance of the service.
+                    self.idle_services.add(ServiceIdle(service_name, avg_idle))
                 if avg_idle < self.percent_idle_low_threshold:
                     print("Service %s is congested!" % service_name)
-                    self.congested_services.append(ServiceIdle(service_name, avg_idle))
+                    self.congested_services.add(ServiceIdle(service_name, avg_idle))
 
     def orchestrator_talker(self):
         while self.running:
             time.sleep(self.assessment_interval)
             # Investigate any suspect URIs
             while self.suspect_uris:
-                uri = self.suspect_uris.pop(0)
+                uri = self.suspect_uris.pop()
                 if not settings.ServiceWaypost.send_to_orchestrator('is_uri_known', uri):
-                    self.unknown_uris.append(uri)
+                    self.unknown_uris.add(uri)
 
             # Deal with any unknown URIs
             while self.unknown_uris:
-                uri = self.unknown_uris.pop(0)
+                uri = self.unknown_uris.pop()
                 settings.ServiceWaypost.send_to_orchestrator('heartbeat_from_unknown_uri', uri)
 
             # Deal with any dead uris
             while self.dead_uris:
-                uri = self.dead_uris.pop(0)
+                uri = self.dead_uris.pop()
                 settings.ServiceWaypost.send_to_orchestrator('heartbeat_failed', uri)
 
             # Deal with any too-idle services
             while self.idle_services:
-                service_idle = self.idle_services.pop(0)  # type: ServiceIdle
+                service_idle = self.idle_services.pop()  # type: ServiceIdle
                 settings.ServiceWaypost.send_to_orchestrator('scale_down',
                                                              service_idle.service_name,
                                                              service_idle.avg_idle)
 
             # Deal with any too-congested services
             while self.congested_services:
-                service_idle = self.congested_services.pop(0)  # type: ServiceIdle
+                service_idle = self.congested_services.pop()  # type: ServiceIdle
                 settings.ServiceWaypost.send_to_orchestrator('scale_up',
                                                              service_idle.service_name,
                                                              service_idle.avg_idle)
