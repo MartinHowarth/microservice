@@ -12,3 +12,4 @@ orchestrator_uri = None
 this_is_orchestrator = False
 
 ServiceWaypost = None  # type: _ServiceWaypost
+Stethoscope = None  # type: _Stethoscope

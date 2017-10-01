@@ -1,5 +1,3 @@
-import sys
-
 from flask import Flask, request, jsonify
 
 
@@ -49,6 +47,10 @@ def management():
         if action in management_waypost.keys():
             result = management_waypost[action](*args, **kwargs)
         else:
+            if action.startswith('__TEST__'):
+                # Expose all functions so they can be triggered by a test function.
+                target, func = action[len('__TEST__'):].split('.')
+                result = test_override(target, func, *args, **kwargs)
             raise InvalidUsage("The requested management action `%s` does not exist." % action)
     else:
         raise InvalidUsage("There was no json included in the management request.")
@@ -102,7 +104,7 @@ def current_deployment_information():
 
 
 def heartbeat():
-    return HealthChecker.heartbeat_response
+    return HealthChecker.heartbeat_info
 
 
 def shut_down(quiesce=True):
@@ -114,6 +116,23 @@ def shut_down(quiesce=True):
         func()
     shutdown_server()
     print("Shutting down server!!!")
+
+
+def test_override(target, func, *args, **kwargs):
+    """
+    Generic interface to allow any function to be called. Primarily aimed for make this solution testable.
+    :param target:
+    :param func:
+    :param args:
+    :param kwargs:
+    :return:
+    """
+    target_func = getattr(globals()[target], func)
+    if callable(target_func):
+        return target_func(*args, **kwargs)
+    else:
+        setattr(globals()[target], func, args[0])
+        return args[0]
 
 
 management_waypost = {
@@ -129,7 +148,7 @@ management_waypost = {
 
 def initialise_microservice(services, host="127.0.0.1", port="5000", **kwargs):
     from microservice.core.service_waypost import init_service_waypost
-    init_service_waypost()
+    init_service_waypost(**kwargs)
     for service in services:
         add_local_service(service)
 

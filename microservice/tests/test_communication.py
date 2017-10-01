@@ -22,7 +22,7 @@ class TestCommunication(TestCase):
         requests.get = self.mocked_requests_get
 
     def test_send_to_uri(self):
-        with self.subTest(msg="Test sending."):
+        with self.subTest(msg="Test sending"):
             args = (5, 6, 7)
             kwargs = {
                 'apple': "tasty",
@@ -32,24 +32,14 @@ class TestCommunication(TestCase):
             action = "test_action"
 
             send_to_uri(uri, *args, **kwargs)
-            send_to_uri(uri, __action=action, *args, **kwargs)
-            send_to_uri(uri, *args, __action=action, **kwargs)
 
             json_data_1 = {
                 '_args': args,
                 '_kwargs': kwargs,
-                'action': None,
-            }
-            json_data_2 = {
-                '_args': args,
-                '_kwargs': kwargs,
-                'action': action,
             }
 
             self.mocked_requests_get.assert_has_calls([
                 call(uri, json=json_data_1),
-                call(uri, json=json_data_2),
-                call(uri, json=json_data_2),
             ])
 
         with self.subTest(msg="Test parsing response"):
@@ -65,13 +55,22 @@ class TestCommunication(TestCase):
         uri = "http://127.0.0.1:5000/test"
         mgmt_uri = "http://127.0.0.1:5000/__management"
         action = "test_action"
+        send_to_mgmt_of_uri(uri, *args, **kwargs)
         send_to_mgmt_of_uri(uri, *args, __action=action, **kwargs)
+        send_to_mgmt_of_uri(uri, __action=action, *args, **kwargs)
 
-        json_data = {
+        json_data_1 = {
+            '_args': args,
+            '_kwargs': kwargs,
+            'action': None,
+        }
+        json_data_2 = {
             '_args': args,
             '_kwargs': kwargs,
             'action': action,
         }
         self.mocked_requests_get.assert_has_calls([
-            call(mgmt_uri, json=json_data),
+            call(mgmt_uri, json=json_data_1),
+            call(mgmt_uri, json=json_data_2),
+            call(mgmt_uri, json=json_data_2),
         ])

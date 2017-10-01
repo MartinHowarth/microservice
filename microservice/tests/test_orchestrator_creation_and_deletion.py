@@ -1,7 +1,6 @@
 import time
 
 from unittest import TestCase
-from unittest.mock import MagicMock
 
 from microservice import quickstart_orchestrator
 
@@ -15,11 +14,11 @@ from microservice.tests.microservices_for_testing import (
 )
 
 
-class TestOrchestratorComplex(TestCase):
+class TestOrchestratorCreationAndDeletion(TestCase):
     def setUp(self):
         # Start the orchestrator
         # Disable the heartbeater so we have more control over starting and stopping instances reliably.
-        quickstart_orchestrator.main(create_heartbeater=False)
+        quickstart_orchestrator.main(disable_healthchecking=True)
 
         # Start the local service waypost
         init_service_waypost()
@@ -39,9 +38,6 @@ class TestOrchestratorComplex(TestCase):
         for service_name, number in services.items():
             with self.subTest(msg=msg + ": Check number of existing %s is %s" % (service_name, number)):
                 orchestrator_info = self.get_current_info(Orchestrator.uri)
-                print(orchestrator_info)
-                print("Getting:", service_name)
-                print("Got:", orchestrator_info['service_providers'].get(service_name, []))
                 self.assertEqual(len(orchestrator_info['service_providers'].get(service_name, [])), number)
 
     def assertKnownServicesAre(self, service_name_to_ask, services):
@@ -50,12 +46,9 @@ class TestOrchestratorComplex(TestCase):
             for service_name, number in services.items():
                 with self.subTest(msg="%s: Check number of known %s is %s" % (uri, service_name, number)):
                     services_info = self.get_current_info(uri)
-                    print(services_info)
-                    print("Getting:", service_name)
-                    print("Got:", services_info['service_providers'].get(service_name, []))
                     self.assertEqual(len(services_info['service_providers'].get(service_name, [])), number)
 
-    def test_service_actions(self):
+    def test_creation_and_deletion(self):
         with self.subTest(msg="Ensure that the correct services are created at initialisation of orchestrator"):
             # Assert that the orchestrator hasn't made any services.
             orchestrator_info = self.get_current_info(Orchestrator.uri)
@@ -172,6 +165,14 @@ class TestOrchestratorComplex(TestCase):
                 'microservice.tests.microservices_for_testing.echo_as_dict5': 1,
             })
 
+            # Make sure that services which use that service are told about the death.
+            self.assertKnownServicesAre(
+                'microservice.tests.microservices_for_testing.echo_as_dict4',
+                {
+                    'microservice.tests.microservices_for_testing.echo_as_dict3': 0,
+                    'microservice.core.pubsub._send_to_pubsub': 1,
+                })
+
         # Sleep to give time for the killed flask server to actually close...
         time.sleep(2)
 
@@ -228,7 +229,7 @@ class TestOrchestratorComplex(TestCase):
                     'microservice.core.pubsub._send_to_pubsub': 1,
                 })
 
-            # Make sure that another service isn't told.
+            # Make sure that another service isn't told accidentally.
             self.assertKnownServicesAre(
                 'microservice.tests.microservices_for_testing.echo_as_dict3',
                 {

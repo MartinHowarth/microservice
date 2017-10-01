@@ -1,9 +1,14 @@
+import threading
+import time
+
 from collections import defaultdict
 
-from microservice.core.communication import send_to_mgmt_of_uri, send_to_uri
-from microservice.core.load_balancer import LocalLoadBalancer
 from microservice.core import pubsub
 from microservice.core import settings
+from microservice.core.communication import send_to_mgmt_of_uri, send_to_uri
+from microservice.core.health_checker import HealthChecker
+from microservice.core.load_balancer import LocalLoadBalancer
+from microservice.core.stethoscope import notify_stethoscope
 
 
 class _ServiceWaypost:
@@ -15,6 +20,25 @@ class _ServiceWaypost:
     service_functions = dict()
 
     local_services = []
+
+    running = False
+    _disable_heartbeating = False
+    _heartbeat = None
+    heartbeat_interval = 1
+
+    def start(self, disable_heartbeating=None, **kwargs):
+        if disable_heartbeating is not None:
+            self._disable_heartbeating = disable_heartbeating
+
+        if not self._disable_heartbeating:
+            self._heartbeat = threading.Thread(target=self.heartbeat)
+
+        self.running = True
+
+    def heartbeat(self):
+        while self.running:
+            time.sleep(self.heartbeat_interval)
+            notify_stethoscope(self.local_uri, HealthChecker.heartbeat_info)
 
     def locate(self, service_name):
         """
@@ -61,8 +85,7 @@ class _ServiceWaypost:
                 del self.service_functions[uri]
             del self.service_providers[service_name]
 
-        self.send_to_orchestrator("report_service_failure",
-                                  service_name)
+        self.send_to_orchestrator("report_service_failure", service_name)
 
     def remove_service_provider(self, service_name, service_uri):
         """
@@ -149,5 +172,6 @@ class _ServiceWaypost:
         }
 
 
-def init_service_waypost():
+def init_service_waypost(**kwargs):
     settings.ServiceWaypost = _ServiceWaypost()
+    settings.ServiceWaypost.start(**kwargs)

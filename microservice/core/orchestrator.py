@@ -1,4 +1,5 @@
 import enum
+import json
 import subprocess
 import sys
 import threading
@@ -10,7 +11,6 @@ from collections import defaultdict
 from flask import Flask, request, jsonify
 
 from microservice.core.communication import send_to_mgmt_of_uri
-from microservice.core.heartbeater import HeartBeater
 from microservice.core.load_balancer import LocalLoadBalancer
 from microservice.core.service_functions import service_uri_information
 from microservice.core import pubsub
@@ -72,8 +72,7 @@ class _Orchestrator:
     # Not sure if this is even worth keeping.
     spawned_subprocesses = {}
 
-    create_heartbeater = True
-    heartbeater = None
+    subprocess_additional_kwargs = {}
 
     to_publish_queue = []
     publisher_thread = None
@@ -81,15 +80,26 @@ class _Orchestrator:
 
     running = True
 
-    def start(self):
+    _disable_healthchecking = False
+
+    def start(self, disable_healthchecking=None, **kwargs):
+        """
+
+        :param kwargs: Arguments can be passed in this way from the command line.
+        :return:
+        """
+        if disable_healthchecking is not None:
+            self._disable_healthchecking = disable_healthchecking
+
+        if self._disable_healthchecking:
+            self.subprocess_additional_kwargs = json.dumps({
+                'disable_heartbeating': True,
+            })
+
         self.running = True
 
         self.publisher_thread = threading.Thread(target=self.send_publishes)
         self.publisher_thread.start()
-
-        if self.create_heartbeater:
-            self.heartbeater = HeartBeater(self)
-            self.heartbeater.start_heartbeat_checking()
 
     def send_publishes(self):
         while self.running:
@@ -129,11 +139,6 @@ class _Orchestrator:
         return result
 
     def locate_provider(self, service_name, consumer):
-        # # If an existing consumer of a service is asking for a provider, then we must assume that they know nothing and
-        # # therefore treat them as a new consumer - so purge them from the consumer records for the requested service.
-        # if consumer in self.service_consumers[service_name]:
-        #     self.service_consumers[service_name].remove(consumer)
-
         print("Locating service %s for consumer:" % service_name, consumer)
         if service_name not in self.service_providers.keys() or not self.service_providers[service_name]:
             print("No existing service for %s." % service_name)
@@ -148,8 +153,6 @@ class _Orchestrator:
         else:
             raise NotImplementedError
         print("Service %s provided by:" % service_name, providers)
-        # if consumer:
-        #     self.service_consumers[service_name].append(consumer)
         return providers
 
     def create_instance(self, service_name):
@@ -158,6 +161,9 @@ class _Orchestrator:
             self.host, self.next_service_port, service_name)
         service_cmd = service_cmd.split(' ')
         self.next_service_port += 1
+
+        if self.subprocess_additional_kwargs:
+            service_cmd.extend(['--other_kwargs', self.subprocess_additional_kwargs])
 
         print("Spawning new service with cmd:", service_cmd)
         new_service = subprocess.Popen(service_cmd, creationflags=DETACHED_PROCESS, close_fds=True)
@@ -168,44 +174,42 @@ class _Orchestrator:
 
         self.send_management(uri, "receive_orchestrator_info", self.uri, uri)
         self.queue_for_publishing(service_name, service_name, uri, __action='receive_service_advertisement')
-        # pubsub.publish(service_name, uri, __action='receive_service_advertisement')
 
     def destroy_instance(self, uri):
         print("Shutting down instance:", uri)
         self.send_management(uri, "shut_down")
         self.retire_uri(uri)
 
-    def scale_down(self, service_name):
+    def scale_down(self, service_name, pct_idle=None):
         # Always leave at least one instance of each service up.
         if len(self.service_providers[service_name]) > 1:
             print("Scaling down service:", service_name)
             uri = self.service_providers[service_name][0]  # Kill the first one created. It's unlucky for some reason.
             self.destroy_instance(uri)
 
-    def scale_up(self, service_name):
+    def scale_up(self, service_name, pct_idle=None):
         print("Scaling up service:", service_name)
         self.create_instance(service_name)
 
     def report_service_failure(self, service_name):
         """
-        An MS has reported a failure - check all the services of that type.
+        An MS has reported a failure.
+
+        TODO: Not sure what to here right now. This could either by a random failure that the healthcheck should
+        pick up; or just a broken code path, about which we can do nothing.
+        Therefore do nothing, but in the future we could be more proactive than waiting for the healthcheck.
+
         :param service_name:
         :return:
         """
         print("Failure report received about service:", service_name)
-        self.heartbeater.heartbeat_service(service_name)
+        return True
 
     def retire_uri(self, uri):
         service_name = service_uri_information(uri).service_name
         try:
             self.service_providers[service_name].remove(uri)
-            # for service in list(self.service_consumers.keys()):
-            #     if uri in self.service_consumers[service]:
-            #         self.service_consumers[service].remove(uri)
-            # print("consumers:", self.service_consumers[service_name])
             self.queue_for_publishing(service_name, service_name, uri, __action='receive_service_retirement')
-            # pubsub.publish(service_name, uri, __action='receive_service_retirement')
-            # self.notify_consumers(service_name, uri, retired=True)
         except ValueError:
             # This catch can be required, for example:
             # If the normal heartbeat is trying to retire the service at the same time as an MS reports a failure
@@ -218,6 +222,16 @@ class _Orchestrator:
         }
         print("current_deployment_information is:", info)
         return info
+
+    def is_uri_known(self, uri):
+        service_name = service_uri_information(uri).service_name
+        return service_name in self.service_providers.keys() and uri in self.service_providers[service_name]
+
+    def heartbeat_from_unknown_uri(self, uri):
+        self.retire_uri(uri)
+
+    def heartbeat_failed(self, uri):
+        self.retire_uri(uri)
 
     # def notify_consumers(self, service_name, uri, retired=False):
     #     print("Notifying consumers about:", service_name, uri, retired)
@@ -253,7 +267,7 @@ def orchestration():
             result = management_waypost[action](*args, **kwargs)
         else:
             if action.startswith('__TEST__'):
-                # Expose all functions so they cna be triggered by a test function.
+                # Expose all functions so they can be triggered by a test function.
                 func = getattr(Orchestrator, action[len('__TEST__'):])
                 result = func(*args, **kwargs)
             else:
@@ -267,15 +281,19 @@ management_waypost = {
     'locate_provider': Orchestrator.locate_provider,
     'report_service_failure': Orchestrator.report_service_failure,
     'current_deployment_information': Orchestrator.current_deployment_information,
+    'is_uri_known': Orchestrator.is_uri_known,
+    'heartbeat_from_unknown_uri': Orchestrator.heartbeat_from_unknown_uri,
+    'heartbeat_failed': Orchestrator.heartbeat_failed,
+    'scale_up': Orchestrator.scale_up,
+    'scale_down': Orchestrator.scale_down,
 }
 
 
-def initialise_orchestration(create_heartbeater=True, **kwargs):
+def initialise_orchestration(**kwargs):
     from microservice.core.service_waypost import init_service_waypost
     init_service_waypost()
 
-    Orchestrator.create_heartbeater = create_heartbeater
-    Orchestrator.start()
+    Orchestrator.start(**kwargs)
     settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
     print("Starting orchestrator on:", Orchestrator.uri)
     app.run(host=Orchestrator.host, port=Orchestrator.port, threaded=True)

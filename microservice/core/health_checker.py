@@ -4,11 +4,15 @@ import time
 
 
 class _HealthChecker:
+    _override_heartbeat_response = {}
+
     @property
-    def heartbeat_response(self):
-        return {
+    def heartbeat_info(self):
+        resp = {
             "percent_idle": self.percent_idle,
         }
+        resp.update(self._override_heartbeat_response)
+        return resp
 
     @property
     def percent_idle(self):

@@ -4,38 +4,23 @@ A set of pretty basic requirements that need implementing.
 Generally aim to implement *something* with the expectation that it could be ripped out easily.
 Learn and improve!
 
-- Automatic test suite
+- More automatic tests!
+    - Healthchecking
+    - Scaling up / down
 - Additional testing:
     - More complicated import models
     - Interaction with other decorators
 - Improve healthchecking:
-    - all MS should publish their status every N seconds.
-    - orchestrators subscribe to heartbeat notifications
-    - when MS dies, it updates it's heartbeat about that too.
+    - all MS subscribe to the healthchecker MS
+    - The MS's therefore know the healthchecker URI
+    - MS's send regular heartbeats to the healthchecker
+    - TBD what we do when we need to scale higher than one healthchecker can handle - there are many implementations out on the internet.
     - Deal with the case where a service is too congested to send a heartbeat in a timely manner
         - probably want to put non-responsive MS's in a quarantine for N time until they either start responding, or we declare them dead
-- Split out the consumer/provider subscriptions from the orchestrator so that we can support e.g. crossbar to provide that service later
-    - I think it works as follows:
-        - MS_A -> O "Can has MS_B please"
-        - O -> MS_A "here is all the MS_B's"
-        - MS_A <stores those MS_B's>
-        - MS_A <spins off thread to do:
-            - MS_A -> S "I would like updates about MS_B please"
-            >
-        - MS_A -> MS_B "do work please" (as normal)
-        And then the standard "pub" part of the subpub:
-        ...
-        - MS_B1 dies
-        - O healthchecks "he's ded doc"
-        - O -> S "yo dawg, MS_B1 ded"
-        - S -> MS_A "RIP: MS_B1"
-        ...
-        - MS_B2 created
-        - O -> S "sup, we got a new friend called MS_B2, he does MS_B for a living"
-        - S -> MS_A "please start sending work to MS_B2 as well"
-        ...
-        - MS_A dies
-        - S notices somehow? Or is told by O
+        - Actually, it's simple: just flag it to die. It's either dead or as-good-as-dead.
+- Make the pubsub system somehow find out about dead subscribers.
+    - MS_A dies
+    - S notices somehow? Or is told by O
 - Deal with many concurrent requests better
     - E.g. imagine a function loop that calls into itself 1000 times before completing
     - We'd need 1000 handlers for that microservice
@@ -65,8 +50,6 @@ Learn and improve!
     - Some sort of transaction ID required.
     - Will need to quiesce on retirement of MS if it's tagged as a stateful MS
 
-- Look into replacing the HTTP interconnection between MS's with ZeroMQ - sounds like it'll be faster/better/stronger
-
 
 # Future improvements
 These are mostly ideas that need thinking about a *lot*.
@@ -83,7 +66,12 @@ Currently there are 3 options:
  - No load balancing
  - Orchestration load balancing (orchestrator tells client about a single MS from a set)
  - Client load balancing (orchestrator tells client about all MS's and the client round robins)
+    - Client gets notified about the services it wants to use.
+    - This is the default option
     - This option actually scales really well, I think.
+        - Better than an independent load balancer because that load balancer has to pass through every request
+        - Worse because every user of MS_1 has to be notified about changes in the existence of MS's that they use.
+            - This pub/sub system works, but really depends on how often we scale up/down individual instances.
 
 Future ideas include:
  - Independent load balancer
@@ -92,10 +80,23 @@ Future ideas include:
  - ??
 
 
+## Better PubSub system
+Home rolled very simple version at the moment.
+
+This is actually only required for client-side load balancing, so think about any plans here in the context of what the right load
+balancer solution is.
+
+Look into moving to use a more generic open source (and therefore hopefully more field hardened) version, suggestions are:
+ - crossbar
+
+
 ## Performance!
+### Testing!
+...
+
 ### Better options for parallel processing within each microservice
-Current (or, at least, at time of writing) implementation uses a local pool of workers from the python `threading`
-module. There are better alternatives:
+Current implementation (at least at time of writing) is just using Flask(threaded=True) and sideways scaling.
+There are probably better alternatives:
 
 - uWSGI (linux only)
     - Listens on given port (either HTTP or custom protocol uwsgi (yes, same name, sigh) which is better performance)

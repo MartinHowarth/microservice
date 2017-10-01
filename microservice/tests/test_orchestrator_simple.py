@@ -16,7 +16,7 @@ class TestOrchestratorSimple(TestCase):
         init_service_waypost()
         settings.deployment_type = settings.DeploymentType.ZERO
 
-    @patch("microservice.core.orchestrator.send_to_uri")
+    @patch("microservice.core.orchestrator.send_to_mgmt_of_uri")
     def test_send_management(self, mock_send_to_uri):
         service_name = "test"
         uri = "http://127.0.0.1:5000/%s" % service_name
@@ -31,7 +31,7 @@ class TestOrchestratorSimple(TestCase):
             Orchestrator.send_management(uri, action, *args, **kwargs)
 
             mock_send_to_uri.assert_has_calls([
-                call('http://127.0.0.1:5000/__management', __action=action, *args, **kwargs)
+                call(uri, __action=action, *args, **kwargs)
             ])
 
         with self.subTest("Test error on sending management"):
@@ -43,14 +43,13 @@ class TestOrchestratorSimple(TestCase):
             Orchestrator.send_management(uri, action, *args, **kwargs)
 
             mock_retire_uri.assert_has_calls([
-                call(service_name, uri)
+                call(uri)
             ])
             Orchestrator.retire_uri = old_retire_uri
 
     @patch("microservice.core.orchestrator.subprocess.Popen")
-    @patch("microservice.core.orchestrator.send_to_uri")
-    @patch("microservice.core.orchestrator.pubsub.publish")
-    def test_create_instance(self, mock_publish, mock_send_to_uri, mock_popen):
+    @patch("microservice.core.orchestrator.send_to_mgmt_of_uri")
+    def test_create_instance(self, mock_send_to_uri, mock_popen):
         service_name = "test_service"
 
         with self.subTest(msg="Test creation and all notifications"):
@@ -60,18 +59,23 @@ class TestOrchestratorSimple(TestCase):
                      close_fds=True, creationflags=8)
             ])
             mock_send_to_uri.assert_has_calls([
-                call('http://127.0.0.1:5000/__management', 'http://127.0.0.1:4999',
+                call('http://127.0.0.1:5000/%s' % service_name, 'http://127.0.0.1:4999',
                      'http://127.0.0.1:5000/%s' % service_name, __action='receive_orchestrator_info')
             ])
-            mock_publish.assert_has_calls([
-                call('test_service', 'http://127.0.0.1:5000/test_service', __action='receive_service_advertisement')
+            self.assertEqual(Orchestrator.to_publish_queue,[
+                {'args': ('test_service', 'test_service', 'http://127.0.0.1:5000/test_service'),
+                 'kwargs': {'__action': 'receive_service_advertisement'}}
             ])
 
         with self.subTest(msg="Test multiple creation"):
             Orchestrator.create_instance(service_name)
             Orchestrator.create_instance(service_name + "2")
-            mock_publish.assert_has_calls([
-                call('test_service', 'http://127.0.0.1:5000/test_service', __action='receive_service_advertisement'),
-                call('test_service', 'http://127.0.0.1:5001/test_service', __action='receive_service_advertisement'),
-                call('test_service2', 'http://127.0.0.1:5002/test_service2', __action='receive_service_advertisement'),
+            print(Orchestrator.to_publish_queue)
+            self.assertEqual(Orchestrator.to_publish_queue, [
+                {'args': ('test_service', 'test_service', 'http://127.0.0.1:5000/test_service'),
+                 'kwargs': {'__action': 'receive_service_advertisement'}},
+                {'args': ('test_service', 'test_service', 'http://127.0.0.1:5001/test_service'),
+                 'kwargs': {'__action': 'receive_service_advertisement'}},
+                {'args': ('test_service2', 'test_service2', 'http://127.0.0.1:5002/test_service2'),
+                 'kwargs': {'__action': 'receive_service_advertisement'}}
             ])
