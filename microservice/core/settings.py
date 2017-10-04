@@ -3,11 +3,12 @@ import enum
 
 class DeploymentType(enum.Enum):
     ZERO = "ZERO"
-    LOCAL = "LOCAL"
+    FLASK = "FLASK"
+    GUNICORN = "GUNICORN"
     DOCKER = "DOCKER"
 
 
-deployment_type = DeploymentType.LOCAL
+deployment_type = DeploymentType.FLASK
 orchestrator_uri = None
 this_is_orchestrator = False
 

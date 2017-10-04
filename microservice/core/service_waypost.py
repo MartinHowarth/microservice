@@ -64,12 +64,10 @@ class _ServiceWaypost:
             mod = __import__(mod_name, globals(), locals(), [func_name], 0)
             func = getattr(mod, func_name)
             self.register_local_service(service_name, func)
-        elif settings.deployment_type == settings.DeploymentType.LOCAL:
+        else:
             service_uris = self.locate_from_orchestrator(service_name)
             for uri in service_uris:
                 self.add_service_provider(service_name, uri)
-        else:
-            raise NotImplementedError
 
         # Now that we've located the service, call back to this function to return it.
         return self.locate(service_name)

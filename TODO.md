@@ -21,7 +21,9 @@ Learn and improve!
 - Make the pubsub system somehow find out about dead subscribers.
     - MS_A dies
     - S notices somehow? Or is told by O
+- Split out "service discovery" from "orchestrator"
 - Deal with many concurrent requests better
+    - Think we get all this for free (and more!) by putting gunicorn in front of flask.
     - E.g. imagine a function loop that calls into itself 1000 times before completing
     - We'd need 1000 handlers for that microservice
     - which right now, requires 1000 threads, of which (at the end) 999 of them are just blocking on another one)
