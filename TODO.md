@@ -5,23 +5,51 @@ Generally aim to implement *something* with the expectation that it could be rip
 Learn and improve!
 
 - More automatic tests!
-    - Healthchecking
-    - Scaling up / down
 - Additional testing:
     - More complicated import models
     - Interaction with other decorators
 - Improve healthchecking:
-    - all MS subscribe to the healthchecker MS
-    - The MS's therefore know the healthchecker URI
-    - MS's send regular heartbeats to the healthchecker
     - TBD what we do when we need to scale higher than one healthchecker can handle - there are many implementations out on the internet.
     - Deal with the case where a service is too congested to send a heartbeat in a timely manner
         - probably want to put non-responsive MS's in a quarantine for N time until they either start responding, or we declare them dead
         - Actually, it's simple: just flag it to die. It's either dead or as-good-as-dead.
+- Add storage
+    - Short term "ephemeral" storage - fast access required
+        - Also needs to serve as a cache for the slower long term storage
+        - Probably a container running memcached
+        - Cluster those containers using astaire
+        - do we want to create an astaire cluster for each use case? i.e. one per stateful MS?
+    - Long term storage - speed less key.
+        - Probably an actual database - cassandra maybe? TBD
+- Add logging
+    - fluentd?
+- Add GUI for monitoring orchestration
+    - Probably pipe all logs through fluentd. Add adapter which spits out stuff to a GUI - SNMP?
+- Add performance tuning options
+    - Minimum number of active services of a type
+    - high/low congestion watermarks (percentage to scale up/down)
+    - number of threads per microservice
+    - enforce single process; and pin each microservice to a single core?
+        - That's not really in the spirit of microservices
+- Add multiple host support
+    - Per-host capacity?
+    - Per-microservice cost to that capacity?
+    - Preferred hosts
+        - Because it's a faster host
+        - Because it's cheaper (e.g. local servers, then expand into AWS)
+    - Core service affinity
+        - Want a minimum of 1 core service per N hosts (probably overkill to have one per host? But not that expensive either)
+            - Orchestrator
+            - Stethoscope
+            - PubSub
+    - Multi-instance of all core services
+- Enable connections across the public internet
+    - Some sort of security - TLS? IPSec?
 - Split out "service discovery" from "orchestrator"
     - I.e. move "locate_provider" elsewhere.
 - Deal with many concurrent requests better
     - Think we get all this for free (and more!) by putting gunicorn in front of flask.
+
     - E.g. imagine a function loop that calls into itself 1000 times before completing
     - We'd need 1000 handlers for that microservice
     - which right now, requires 1000 threads, of which (at the end) 999 of them are just blocking on another one)
@@ -50,6 +78,9 @@ Learn and improve!
     - Some sort of transaction ID required.
     - Will need to quiesce on retirement of MS if it's tagged as a stateful MS
 
+
+- Replace the home-rolled RPC with a better version
+    - One option is crossbar, but that puts all requests through a single server
 
 # Future improvements
 These are mostly ideas that need thinking about a *lot*.
@@ -87,7 +118,7 @@ This is actually only required for client-side load balancing, so think about an
 balancer solution is.
 
 Look into moving to use a more generic open source (and therefore hopefully more field hardened) version, suggestions are:
- - crossbar
+ - crossbar.io
 
 
 ## Performance!
