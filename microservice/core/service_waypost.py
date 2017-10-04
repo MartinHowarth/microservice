@@ -7,7 +7,6 @@ from microservice.core import pubsub
 from microservice.core import settings
 from microservice.core.communication import send_to_mgmt_of_uri, send_to_uri
 from microservice.core.health_checker import HealthChecker
-from microservice.core.load_balancer import LocalLoadBalancer
 from microservice.core.stethoscope import notify_stethoscope
 
 
@@ -16,7 +15,7 @@ class _ServiceWaypost:
 
     local_uri = None
 
-    service_providers = defaultdict(LocalLoadBalancer)
+    service_providers = defaultdict(list)
     service_functions = dict()
 
     local_services = []

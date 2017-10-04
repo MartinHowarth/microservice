@@ -138,8 +138,7 @@ class _Orchestrator:
             result = False
         return result
 
-    def locate_provider(self, service_name, consumer):
-        print("Locating service %s for consumer:" % service_name, consumer)
+    def locate_provider(self, service_name):
         if service_name not in self.service_providers.keys() or not self.service_providers[service_name]:
             print("No existing service for %s." % service_name)
             self.create_instance(service_name)
