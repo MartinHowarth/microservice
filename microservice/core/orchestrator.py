@@ -75,6 +75,7 @@ class _Orchestrator:
     subprocess_additional_kwargs = {}
 
     to_publish_queue = []
+    to_purge_queue = []
     publisher_thread = None
     publish_interval = 0.1
 
@@ -108,6 +109,11 @@ class _Orchestrator:
                 publish = self.to_publish_queue.pop(0)
                 print("Actually publishing:", publish)
                 pubsub.publish(*publish['args'], **publish['kwargs'])
+            while self.to_purge_queue:
+                # Take from the front of the queue.
+                purge = self.to_purge_queue.pop(0)
+                print("Actually purging:", purge)
+                pubsub.purge(*purge['args'], **purge['kwargs'])
             time.sleep(self.publish_interval)
 
     def queue_for_publishing(self, *args, **kwargs):
@@ -119,6 +125,18 @@ class _Orchestrator:
         :return:
         """
         self.to_publish_queue.append({
+            'args': args,
+            'kwargs': kwargs
+        })
+
+    def queue_for_purging(self, *args, **kwargs):
+        """
+        Queue events for purging.
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        self.to_purge_queue.append({
             'args': args,
             'kwargs': kwargs
         })
@@ -209,6 +227,7 @@ class _Orchestrator:
         try:
             self.service_providers[service_name].remove(uri)
             self.queue_for_publishing(service_name, service_name, uri, __action='receive_service_retirement')
+            self.queue_for_purging(uri)
         except ValueError:
             # This catch can be required, for example:
             # If the normal heartbeat is trying to retire the service at the same time as an MS reports a failure

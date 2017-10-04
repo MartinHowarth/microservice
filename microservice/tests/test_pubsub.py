@@ -66,6 +66,28 @@ class TestPubSub(TestCase):
                 }
             )
 
+        PubSub.handle_subscribe("event_1", "consumer_1")
+        PubSub.handle_subscribe("event_2", "consumer_2")
+        with self.subTest(msg="Test purge"):
+            PubSub.handle_purge("consumer_1")
+            self.assertEqual(
+                PubSub.consumers,
+                {
+                    'event_1': [],
+                    'event_2': ['consumer_2'],
+                }
+            )
+
+            PubSub.handle_purge("consumer_2")
+            self.assertEqual(
+                PubSub.consumers,
+                {
+                    'event_1': [],
+                    'event_2': [],
+                }
+            )
+            PubSub.handle_purge("consumer_3")
+
 
 class TestPubSubHelpers(TestCase):
     def setUp(self):
@@ -79,6 +101,10 @@ class TestPubSubHelpers(TestCase):
         self.original_handle_subscribe = PubSub.handle_subscribe
         self.mocked_handle_subscribe = MagicMock()
         PubSub.handle_subscribe = self.mocked_handle_subscribe
+
+        self.original_handle_purge = PubSub.handle_purge
+        self.mocked_handle_purge = MagicMock()
+        PubSub.handle_purge = self.mocked_handle_purge
 
     def tearDown(self):
         PubSub.handle_publish = self.original_handle_publish
@@ -103,3 +129,8 @@ class TestPubSubHelpers(TestCase):
         pubsub.subscribe("event_1", "consumer_1")
 
         self.mocked_handle_subscribe.assert_has_calls([call("event_1", "consumer_1")])
+
+    def test_purge(self):
+        pubsub.purge("consumer_1")
+
+        self.mocked_handle_purge.assert_has_calls([call("consumer_1")])

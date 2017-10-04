@@ -18,10 +18,8 @@ Learn and improve!
     - Deal with the case where a service is too congested to send a heartbeat in a timely manner
         - probably want to put non-responsive MS's in a quarantine for N time until they either start responding, or we declare them dead
         - Actually, it's simple: just flag it to die. It's either dead or as-good-as-dead.
-- Make the pubsub system somehow find out about dead subscribers.
-    - MS_A dies
-    - S notices somehow? Or is told by O
 - Split out "service discovery" from "orchestrator"
+    - I.e. move "locate_provider" elsewhere.
 - Deal with many concurrent requests better
     - Think we get all this for free (and more!) by putting gunicorn in front of flask.
     - E.g. imagine a function loop that calls into itself 1000 times before completing

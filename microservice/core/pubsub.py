@@ -7,11 +7,11 @@ from microservice.core.decorator import microservice
 class PubSubFunctions:
     PUBLISH = 'publish'
     SUBSCRIBE = 'subscribe'
+    UNSUBSCRIBE = 'unsubscribe'
+    PURGE = 'purge'
 
 
 class _PubSub:
-    # Todo: This needs to deal with subscribers disappearing - i.e. some way to retire subscribers without the
-    # subscribers doing it - they're probably dead.
     consumers = defaultdict(list)
 
     def handle_subscribe(self, event_type, consumer):
@@ -34,6 +34,11 @@ class _PubSub:
     def notify_consumer(self, consumer, *args, **kwargs):
         result = send_to_mgmt_of_uri(consumer, *args, **kwargs)
 
+    def handle_purge(self, consumer):
+        for event_type, consumers in self.consumers.items():
+            if consumer in consumers:
+                consumers.remove(consumer)
+
 
 PubSub = _PubSub()
 
@@ -43,8 +48,12 @@ def _send_to_pubsub(signal, *args, __consumer=None, __event_type=None, **kwargs)
     print(signal, args, __consumer, __event_type, kwargs)
     if signal == PubSubFunctions.SUBSCRIBE:
         PubSub.handle_subscribe(__event_type, __consumer)
+    elif signal == PubSubFunctions.UNSUBSCRIBE:
+        PubSub.handle_unsubscribe(__event_type, __consumer)
     elif signal == PubSubFunctions.PUBLISH:
         PubSub.handle_publish(__event_type, *args, **kwargs)
+    elif signal == PubSubFunctions.PURGE:
+        PubSub.handle_purge(__consumer)
 
 
 def publish(event_type, *args, **kwargs):
@@ -55,3 +64,13 @@ def publish(event_type, *args, **kwargs):
 def subscribe(event_type, consumer):
     print("%s is subscribing to:" % consumer, event_type)
     return _send_to_pubsub(PubSubFunctions.SUBSCRIBE, __event_type=event_type, __consumer=consumer)
+
+
+def unsubscribe(event_type, consumer):
+    print("%s is unsubscribing from:" % consumer, event_type)
+    return _send_to_pubsub(PubSubFunctions.UNSUBSCRIBE, __event_type=event_type, __consumer=consumer)
+
+
+def purge(consumer):
+    print("%s is being purged." % consumer)
+    return _send_to_pubsub(PubSubFunctions.PURGE, __consumer=consumer)
