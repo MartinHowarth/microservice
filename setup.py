@@ -44,10 +44,13 @@ setup(
     keywords='microservice',
 
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
+    package_data={'microservice': ['data/*']},
 
     install_requires=[
         'flask',
         'requests',
+        'kubernetes',
+        'docker',
     ],
 
     entry_points={

@@ -4,6 +4,19 @@ A set of pretty basic requirements that need implementing.
 Generally aim to implement *something* with the expectation that it could be ripped out easily.
 Learn and improve!
 
+- Move to kubernetes
+    - Define dockerfile and build process for this package
+    - Create init:
+        - define set of pods
+            - one pod per microservice (so they can scale independently)
+            - optionally later we can support multi-service pods (e.g. BYO datastore for the pod)
+        - create namespace
+        - create Deployment for each microservice
+        - (later) support daemonsets for storage/stateful stuff
+    - Add "external" flag to microservice decorator
+        - The kubernetes Service for this will get exposed
+
+
 - More automatic tests!
 - Additional testing:
     - More complicated import models

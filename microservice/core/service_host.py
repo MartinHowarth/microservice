@@ -65,6 +65,8 @@ def add_local_service(service_name):
     def new_service():
         req_json = request.get_json()
         print("Service %s received request info:" % service_name, req_json)
+        if req_json is None:
+            req_json = {}
         func_args = req_json.get('_args', [])
         func_kwargs = req_json.get('_kwargs', {})
         result = robust_service_call(service_name)(*func_args, **func_kwargs)
