@@ -73,7 +73,7 @@ class _ServiceWaypost:
         :param str service_name: Name of the service to register as locally provided.
         :param function func: The actual local function to register.
         """
-        print("Registering %s as local service:" % service_name)
+        print("Registering %s as local service." % service_name)
         self.service_functions[service_name] = func
         self.local_services.append(service_name)
 
