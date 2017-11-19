@@ -37,10 +37,12 @@ class KubeMicroservice:
         self.api: client.CoreV1Api = None
         self.api_beta1: client.AppsV1beta1Api = None
         self.api_extensions_beta1: client.ExtensionsV1beta1Api = None
+        self.api_autoscaling: client.AutoscalingV1Api = None
 
         self._service: client.V1Service = None
         self._deployment: client.AppsV1beta1Deployment = None
         self._ingress: client.V1beta1Ingress = None
+        self._hpa: client.V1HorizontalPodAutoscaler = None
 
     def deploy(self):
 
@@ -49,9 +51,11 @@ class KubeMicroservice:
         self.api = client.CoreV1Api(client.ApiClient(config=kube_api_configuration))
         self.api_beta1 = client.AppsV1beta1Api(client.ApiClient(config=kube_api_configuration))
         self.api_extensions_beta1 = client.ExtensionsV1beta1Api(client.ApiClient(config=kube_api_configuration))
+        self.api_autoscaling = client.AutoscalingV1Api(client.ApiClient(config=kube_api_configuration))
 
         self.create_service()
         self.create_deployment()
+        self.create_hpa()
         if self.exposed:
             self.create_ingress()
 
@@ -106,10 +110,6 @@ class KubeMicroservice:
                 raise
 
     def create_ingress(self):
-        """
-        Create an ingress for this service.
-        :return:
-        """
         try:
             self._ingress = self.api_extensions_beta1.create_namespaced_ingress(
                 namespace=kube_namespace,
@@ -124,6 +124,24 @@ class KubeMicroservice:
                 name=self.kube_name,
                 namespace=kube_namespace,
                 body=self.ingress_definition,
+                pretty=True,
+            )
+
+    def create_hpa(self):
+        try:
+            self._hpa = self.api_autoscaling.create_namespaced_horizontal_pod_autoscaler(
+                namespace=kube_namespace,
+                body=self.hpa_definition,
+                pretty=True,
+            )
+        except client.rest.ApiException as exp:
+            if 'AlreadyExists' not in exp.body:
+                raise
+            print("HPA {0} already exists - patching.".format(self.kube_name))
+            self._hpa = self.api_autoscaling.patch_namespaced_horizontal_pod_autoscaler(
+                name=self.kube_name,
+                namespace=kube_namespace,
+                body=self.hpa_definition,
                 pretty=True,
             )
 
@@ -177,6 +195,11 @@ class KubeMicroservice:
                     image=self.raw_name,
                     ports=[client.V1ContainerPort(container_port=5000)],
                     image_pull_policy='Never',
+                    resources=client.V1ResourceRequirements(
+                        requests={
+                            'cpu': '100m',
+                        },
+                    ),
                 ),
             ]
         )
@@ -192,6 +215,24 @@ class KubeMicroservice:
                     service_name=self.kube_name,
                     service_port=5000,
                 )
+            ),
+        )
+
+    @property
+    def hpa_definition(self):
+        return client.V1HorizontalPodAutoscaler(
+            metadata=client.V1ObjectMeta(
+                name=self.kube_name,
+                namespace=kube_namespace,
+            ),
+            spec=client.V1HorizontalPodAutoscalerSpec(
+                min_replicas=1,
+                max_replicas=100,
+                scale_target_ref=client.V1CrossVersionObjectReference(
+                    kind="Deployment",
+                    name=self.kube_name,
+                ),
+                target_cpu_utilization_percentage=50,
             ),
         )
 
