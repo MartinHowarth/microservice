@@ -8,7 +8,7 @@ class DeploymentType(enum.Enum):
     DOCKER = "DOCKER"
 
 
-kube_name = "pycroservices"
+kube_namespace = "pycroservices"
 
 deployment_type = DeploymentType.FLASK
 orchestrator_uri = None

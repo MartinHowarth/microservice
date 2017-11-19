@@ -1,55 +1,130 @@
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-from pprint import pprint
 
-from microservice.core.settings import kube_name
+from microservice.core.settings import kube_namespace
 
 
 kube_api_configuration = None
 
 
 class KubeMicroservice:
-    def __init__(self, name, exposed=False):
-        load_kube_config()
+    def __init__(self, name, exposed_port=None):
+        # This must match the container name
+        self.raw_name = name
 
-        self.name = name
-        self.exposed = exposed
+        # K8s requires sanitised names for DNS purposes
+        self.kube_name = name.replace('.', '-').replace('_', '-')
+        self.exposed_port = exposed_port
+
+        self.api: client.CoreV1Api = None
+        self.api_beta1: client.AppsV1beta1Api = None
+        self.api_extensions_beta1: client.ExtensionsV1beta1Api = None
+
+        self._service: client.V1Service = None
+        self._deployment: client.AppsV1beta1Deployment = None
+        self._ingress: client.V1beta1Ingress = None
+
+    def deploy(self):
+
+        load_kube_config()
 
         self.api = client.CoreV1Api(client.ApiClient(config=kube_api_configuration))
         self.api_beta1 = client.AppsV1beta1Api(client.ApiClient(config=kube_api_configuration))
+        self.api_extensions_beta1 = client.ExtensionsV1beta1Api(client.ApiClient(config=kube_api_configuration))
 
-    def deploy(self):
         self.create_service()
         self.create_deployment()
+        if self.exposed_port is not None:
+            self.create_ingress()
 
     def create_service(self):
-        self.api.create_namespaced_service(
-            namespace=kube_name,
-            body=self.service_definition
-        )
+        try:
+            self._service = self.api.create_namespaced_service(
+                namespace=kube_namespace,
+                body=self.service_definition,
+                pretty=True,
+            )
+        except client.rest.ApiException as exp:
+            if 'AlreadyExists' not in exp.body:
+                raise
+            print("Service {0} already exists - patching.".format(self.kube_name))
+            try:
+                self.api.patch_namespaced_service(
+                    name=self.kube_name,
+                    namespace=kube_namespace,
+                    body=self.service_definition,
+                    pretty=True,
+                )
+            except client.rest.ApiException as exp2:
+                if 'FieldValueDuplicate' in exp2.body:
+                    print("Possible cause:"
+                          "Patching mechanism doesn't cope with changing ports (it tries to add a second one) - "
+                          "manually delete the service resource and try again.")
+                raise
 
     def create_deployment(self):
-        self.api_beta1.create_namespaced_deployment(
-            namespace=kube_name,
-            body=self.deployment_definition
-        )
+        try:
+            self._deployment = self.api_beta1.create_namespaced_deployment(
+                namespace=kube_namespace,
+                body=self.deployment_definition,
+                pretty=True,
+            )
+        except client.rest.ApiException as exp:
+            if 'AlreadyExists' not in exp.body:
+                raise
+            print("Deployment {0} already exists - patching.".format(self.kube_name))
+            try:
+                self.api_beta1.patch_namespaced_deployment(
+                    name=self.kube_name,
+                    namespace=kube_namespace,
+                    body=self.deployment_definition,
+                    pretty=True,
+                )
+            except client.rest.ApiException as exp2:
+                if 'FieldValueDuplicate' in exp2.body:
+                    print("Possible cause:"
+                          "Patching mechanism doesn't cope with changing ports (it tries to add a second one) - "
+                          "manually delete the deployment and pod resources and try again.")
+                raise
+
+    def create_ingress(self):
+        """
+        Create an ingress for this service.
+        :return:
+        """
+        try:
+            self._ingress = self.api_extensions_beta1.create_namespaced_ingress(
+                namespace=kube_namespace,
+                body=self.ingress_definition,
+                pretty=True,
+            )
+        except client.rest.ApiException as exp:
+            if 'AlreadyExists' not in exp.body:
+                raise
+            print("Ingress {0} already exists - patching.".format(self.kube_name))
+            self._ingress = self.api_extensions_beta1.patch_namespaced_ingress(
+                name=self.kube_name,
+                namespace=kube_namespace,
+                body=self.ingress_definition,
+                pretty=True,
+            )
 
     @property
     def deployment_definition(self):
         return client.AppsV1beta1Deployment(
             metadata=client.V1ObjectMeta(
-                name=self.name,
-                namespace=kube_name,
-                labels={'microservice': self.name},
+                name=self.kube_name,
+                namespace=kube_namespace,
+                labels={'pycroservice': kube_namespace},
             ),
             spec=client.AppsV1beta1DeploymentSpec(
                 replicas=1,
                 selector=client.V1LabelSelector(
-                    match_labels={'microservice': self.name},
+                    match_labels={'microservice': self.kube_name},
                 ),
                 template=client.V1PodTemplateSpec(
                     metadata=client.V1ObjectMeta(
-                        labels={'microservice': self.name},
+                        labels={'microservice': self.kube_name},
                     ),
                     spec=self.pod_spec,
                 ),
@@ -60,44 +135,45 @@ class KubeMicroservice:
     def service_definition(self):
         return client.V1Service(
                 metadata=client.V1ObjectMeta(
-                    name=self.name,
-                    namespace=kube_name,
-                    labels={'microservice': self.name}
+                    name=self.kube_name,
+                    namespace=kube_namespace,
+                    labels={'microservice': self.kube_name}
                 ),
                 spec=client.V1ServiceSpec(
-                    external_traffic_policy="NodePort" if self.exposed else None,
-                    # external_i_ps=['192.168.99.100'],
-                    ports=[client.V1ServicePort(port=80)],
-                    selector={'microservice': self.name},
+                    type="LoadBalancer" if self.exposed_port else None,
+                    ports=[client.V1ServicePort(
+                        name=self.kube_name,
+                        port=5000,
+                    )],
+                    selector={'microservice': self.kube_name},
                 )
             )
-
-    @property
-    def startup_command(self):
-        return "microservice --host %s --port %s --local_services %s" % (
-            "0.0.0.0", 80, self.name)
-
-    # @property
-    # def pod_definition(self):
-    #     return client.V1Pod(
-    #             spec=self.pod_spec,
-    #             metadata=client.V1ObjectMeta(
-    #                 name=self.name,
-    #                 labels={'microservice': self.name}
-    #             )
-    #         )
 
     @property
     def pod_spec(self):
         return client.V1PodSpec(
             containers=[
                 client.V1Container(
-                    name=self.name,
-                    image=kube_name,
-                    ports=[client.V1ContainerPort(80)],
-                    args=['/bin/sh', '-c', self.startup_command],
+                    name=self.kube_name,
+                    image=self.raw_name,
+                    ports=[client.V1ContainerPort(container_port=5000)],
+                    image_pull_policy='Never',
                 ),
             ]
+        )
+
+    @property
+    def ingress_definition(self):
+        return client.V1beta1Ingress(
+            metadata=client.V1ObjectMeta(
+                name=self.kube_name
+            ),
+            spec=client.V1beta1IngressSpec(
+                backend=client.V1beta1IngressBackend(
+                    service_name=self.kube_name,
+                    service_port=self.exposed_port,
+                )
+            ),
         )
 
 
@@ -110,104 +186,23 @@ def load_kube_config():
     kube_api_configuration = client.Configuration()
 
 
-def create_all_deployments(service_names):
-    for service_name in service_names:
-        kms = KubeMicroservice(service_name)
-        kms.deploy()
-
-
 def pycroservice_init():
+    """
+    Initialise the generic k8s requirements for a new pycroservice deployment.
+    Specifically:
+     - Ensure that the namespace exists
+    """
     load_kube_config()
 
     api = client.CoreV1Api(client.ApiClient(config=kube_api_configuration))
-    if kube_name not in [ns.metadata.name for ns in api.list_namespace().items]:
-        print("Kube namespace {0} doesn't exist - creating...".format(kube_name))
+    if kube_namespace not in [ns.metadata.name for ns in api.list_namespace().items]:
+        print("Kube namespace {0} doesn't exist - creating...".format(kube_namespace))
         api.create_namespace(
             client.V1Namespace(
                 metadata={
-                    'name': kube_name,
+                    'name': kube_namespace,
                 }
-            )
+            ),
+            pretty=True,
         )
-        print("Kube namespace {0} created".format(kube_name))
-
-
-#
-# config.load_kube_config()
-#
-# # Configure API key authorization: BearerToken
-# # client.configuration.api_key['authorization'] = 'YOUR_API_KEY'
-# # Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# # kubernetes.client.configuration.api_key_prefix['authorization'] = 'Bearer'
-# # create an instance of the API class
-# api_instance = client.AdmissionregistrationApi()
-#
-# try:
-#     api_response = api_instance.get_api_group()
-#     pprint(api_response)
-# except ApiException as e:
-#     print("Exception when calling AdmissionregistrationApi->get_api_group: %s\n" % e)
-#
-#
-# # config.load_kube_config()
-#
-# # v1 = client.CoreV1Api()
-#
-#
-# def deploy_microservice(service_name):
-#     configuration = client.Configuration()
-#     api_instance = client.CoreV1Api(client.ApiClient(configuration))
-#     namespace = 'microservice'
-#     body = client.V1Service()
-#
-#
-#
-# def create_service(service_name):
-#     configuration = client.Configuration()
-#     api_instance = client.CoreV1Api(client.ApiClient(configuration))
-#     namespace = 'namespace_example'  # str | object name and auth scope, such as for teams and projects
-#     body = client.V1Service()  # V1Service |
-#     pretty = 'pretty_example'  # str | If 'true', then the output is pretty printed. (optional)
-#
-#     try:
-#         api_response = api_instance.create_namespaced_service(namespace, body, pretty=pretty)
-#         pprint(api_response)
-#     except ApiException as e:
-#         print("Exception when calling CoreV1Api->create_namespaced_service: %s\n" % e)
-#
-# def create_ingress(external_ip, external_port):
-#     pass
-#
-#
-# def list_all_pods():
-#     configuration = client.Configuration()
-#     api_instance = client.CoreV1Api(client.ApiClient(config=configuration))
-#     print("Listing pods with their IPs:")
-#     ret = api_instance.list_pod_for_all_namespaces(watch=False)
-#     for i in ret.items:
-#         print("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
-#
-#
-# def list_all_services():
-#     configuration = client.Configuration()
-#     api_instance = client.CoreV1Api(client.ApiClient(config=configuration))
-#     print("Listing services with their IPs:")
-#     ret = api_instance.list_service_for_all_namespaces(watch=False)
-#     for i in ret.items:
-#         print("%s\t%s\t%s" % (i.spec.cluster_ip, i.metadata.namespace, i.metadata.name))
-#
-#
-# def list_all_namespaces():
-#     configuration = client.Configuration()
-#     api_instance = client.CoreV1Api(client.ApiClient(config=configuration))
-#     print("Listing pods with their IPs:")
-#     ret = api_instance.list_namespace(watch=False)
-#     for i in ret.items:
-#         print("%s" % ( i.metadata.name))
-#
-# list_all_pods()
-# list_all_services()
-#
-# import requests
-#
-# print(requests.get('http://192.168.99.100:80').text)
+        print("Kube namespace {0} created".format(kube_namespace))
