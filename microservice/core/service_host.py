@@ -61,7 +61,7 @@ def add_local_service(service_name):
     print("Creating new service of name:", service_name)
 
     # Define the flask app route for this service.
-    @app.route('/%s' % service_name, endpoint=service_name)
+    @app.route('/')
     def new_service():
         req_json = request.get_json()
         print("Service %s received request info:" % service_name, req_json)
@@ -69,7 +69,7 @@ def add_local_service(service_name):
             req_json = {}
         func_args = req_json.get('_args', [])
         func_kwargs = req_json.get('_kwargs', {})
-        result = robust_service_call(service_name)(*func_args, **func_kwargs)
+        result = settings.ServiceWaypost.locate(service_name)(*func_args, **func_kwargs)
         return jsonify({'_args': result})
 
     # Now expose this function at the global scope so that it persists as a new flask route.
@@ -85,39 +85,6 @@ def add_local_service(service_name):
     print("Dynamically found module is:", mod)
     print("Dynamically found function is:", func)
     settings.ServiceWaypost.register_local_service(service_name, func)
-
-
-def receive_service_advertisement(service_name, service_uri):
-    settings.ServiceWaypost.add_service_provider(service_name, service_uri)
-
-
-def receive_service_retirement(service_name, service_uri):
-    settings.ServiceWaypost.remove_service_provider(service_name, service_uri)
-
-
-def receive_orchestrator_info(orchestrator_uri, local_uri):
-    print("Orchestrator is found at:", orchestrator_uri)
-    settings.ServiceWaypost.orchestrator_uri = orchestrator_uri
-    settings.ServiceWaypost.local_uri = local_uri
-
-
-def current_deployment_information():
-    return settings.ServiceWaypost.current_deployment_information()
-
-
-def heartbeat():
-    return HealthChecker.heartbeat_info
-
-
-def shut_down(quiesce=True):
-    # Quiesce is always true with this implementation.
-    def shutdown_server():
-        func = request.environ.get('werkzeug.server.shutdown')
-        if func is None:
-            raise RuntimeError('Not running with the Werkzeug Server')
-        func()
-    shutdown_server()
-    print("Shutting down server!!!")
 
 
 def test_override(target, func, *args, **kwargs):
@@ -139,16 +106,10 @@ def test_override(target, func, *args, **kwargs):
 
 management_waypost = {
     'add_local_service': add_local_service,
-    'receive_service_advertisement': receive_service_advertisement,
-    'receive_service_retirement': receive_service_retirement,
-    'receive_orchestrator_info': receive_orchestrator_info,
-    'heartbeat': heartbeat,
-    'shut_down': shut_down,
-    'current_deployment_information': current_deployment_information,
 }
 
 
-def initialise_microservice(services, host="127.0.0.1", port="5000", **kwargs):
+def initialise_microservice(services, host="0.0.0.0", port="5000", **kwargs):
     from microservice.core.service_waypost import init_service_waypost
     init_service_waypost(**kwargs)
     for service in services:

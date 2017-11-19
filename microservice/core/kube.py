@@ -7,14 +7,18 @@ from microservice.core.settings import kube_namespace
 kube_api_configuration = None
 
 
+def sanitise_name(name):
+    return name.replace('.', '-').replace('_', '-')
+
+
 class KubeMicroservice:
-    def __init__(self, name, exposed_port=None):
+    def __init__(self, name, exposed=False):
         # This must match the container name
         self.raw_name = name
 
         # K8s requires sanitised names for DNS purposes
-        self.kube_name = name.replace('.', '-').replace('_', '-')
-        self.exposed_port = exposed_port
+        self.kube_name = sanitise_name(name)
+        self.exposed = exposed
 
         self.api: client.CoreV1Api = None
         self.api_beta1: client.AppsV1beta1Api = None
@@ -34,7 +38,7 @@ class KubeMicroservice:
 
         self.create_service()
         self.create_deployment()
-        if self.exposed_port is not None:
+        if self.exposed:
             self.create_ingress()
 
     def create_service(self):
@@ -140,10 +144,11 @@ class KubeMicroservice:
                     labels={'microservice': self.kube_name}
                 ),
                 spec=client.V1ServiceSpec(
-                    type="LoadBalancer" if self.exposed_port else None,
+                    type="NodePort" if self.exposed else None,
                     ports=[client.V1ServicePort(
                         name=self.kube_name,
-                        port=5000,
+                        port=80,
+                        target_port=5000,
                     )],
                     selector={'microservice': self.kube_name},
                 )
@@ -171,7 +176,7 @@ class KubeMicroservice:
             spec=client.V1beta1IngressSpec(
                 backend=client.V1beta1IngressBackend(
                     service_name=self.kube_name,
-                    service_port=self.exposed_port,
+                    service_port=5000,
                 )
             ),
         )
