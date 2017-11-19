@@ -7,8 +7,22 @@ from microservice.core.settings import kube_namespace
 kube_api_configuration = None
 
 
-def sanitise_name(name):
-    return name.replace('.', '-').replace('_', '-')
+def sanitise_name(name: str) -> str:
+    """
+    Change given service name into k8s compatible name, including:
+      - 63 character limit
+      - No '.', '_'
+    :param name:
+    :return:
+    """
+    name = name.replace('.', '-').replace('_', '-')
+    if len(name) > 50:
+        name = name[len(name) - 50:]
+
+    # K8s requires an alphanumeric first character
+    while not name[0].isalpha():
+        name = name[1:]
+    return name
 
 
 class KubeMicroservice:

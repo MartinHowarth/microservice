@@ -17,8 +17,8 @@ def sum_random_list(size):
 
 
 @microservice
-def intensive_calculation_1(size):
-    return sum_random_list(size)
+def intensive_calculation_1():
+    return sum_random_list(10000)
 
 
 @microservice
@@ -40,21 +40,20 @@ def intensive_calculator_fanout():
     }
 
     def do_work1():
-        res = intensive_calculation_1(10000)
-        print("Intensive calculation 1x1000000 says:", res)
+        res = intensive_calculation_1()
+        print("Intensive calculation 1 says:", res)
         results[1].append(res)
 
     def do_work2():
         res = intensive_calculation_2(10000)
-        print("Intensive calculation 2x1000000 says:", res)
+        print("Intensive calculation 2 says:", res)
         results[2].append(res)
 
     def do_work3():
         res = intensive_calculation_3(10000)
-        print("Intensive calculation 3x1000000 says:", res)
+        print("Intensive calculation 3 says:", res)
         results[3].append(res)
 
-    # Starting a 20 second process every 5 seconds should show that we scale up (and then down) nicely.
     threads = []
     for i in range(100):
         thr = threading.Thread(target=do_work1)
