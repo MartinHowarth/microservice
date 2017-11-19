@@ -1,8 +1,5 @@
 from flask import Flask, request, jsonify
 
-
-from microservice.core.decorator import robust_service_call
-from microservice.core.health_checker import HealthChecker
 from microservice.core import settings
 
 app = Flask(__name__)
@@ -29,32 +26,6 @@ def handle_invalid_usage(error):
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
     return response
-
-
-@app.route("/__management")
-def management():
-    """
-    General interface for the external forces to manage this microservice.
-
-    This is the interface that the Orchestrator uses.
-    """
-    management_json = request.get_json()
-    if management_json:
-        print("Received management request:", management_json)
-        action = management_json.get('action', None)
-        args = management_json.get('_args', [])
-        kwargs = management_json.get('_kwargs', {})
-        if action in management_waypost.keys():
-            result = management_waypost[action](*args, **kwargs)
-        else:
-            if action.startswith('__TEST__'):
-                # Expose all functions so they can be triggered by a test function.
-                target, func = action[len('__TEST__'):].split('.')
-                result = test_override(target, func, *args, **kwargs)
-            raise InvalidUsage("The requested management action `%s` does not exist." % action)
-    else:
-        raise InvalidUsage("There was no json included in the management request.")
-    return jsonify({'_args': result})
 
 
 def add_local_service(service_name):
@@ -85,28 +56,6 @@ def add_local_service(service_name):
     print("Dynamically found module is:", mod)
     print("Dynamically found function is:", func)
     settings.ServiceWaypost.register_local_service(service_name, func)
-
-
-def test_override(target, func, *args, **kwargs):
-    """
-    Generic interface to allow any function to be called. Primarily aimed for make this solution testable.
-    :param target:
-    :param func:
-    :param args:
-    :param kwargs:
-    :return:
-    """
-    target_func = getattr(globals()[target], func)
-    if callable(target_func):
-        return target_func(*args, **kwargs)
-    else:
-        setattr(globals()[target], func, args[0])
-        return args[0]
-
-
-management_waypost = {
-    'add_local_service': add_local_service,
-}
 
 
 def initialise_microservice(services, host="0.0.0.0", port="5000", **kwargs):

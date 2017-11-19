@@ -1,6 +1,4 @@
-from microservice.core.orchestrator import Orchestrator
 from microservice.core.service_waypost import init_service_waypost
-from microservice.core import settings
 
 from microservice.examples.intensive_calculators import (intensive_calculation_1, intensive_calculation_2,
                                                          intensive_calculation_3)
@@ -8,7 +6,6 @@ from microservice.examples.intensive_calculators import (intensive_calculation_1
 
 if __name__ == "__main__":
     init_service_waypost()
-    settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
 
     for i in range(30):
         print("Intensive calculation 1x100000 says:", intensive_calculation_1(100000))

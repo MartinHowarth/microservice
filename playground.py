@@ -2,6 +2,20 @@ import collections
 db = collections.defaultdict(dict)
 
 
+import requests
+req = requests.get(
+    "http://192.168.99.100:5000/microservice.examples.hello_world.hello_world",
+    json={
+        '_args': tuple(),
+        '_kwargs': {},
+    }
+)
+print(req)
+print(req.text)
+
+exit()
+
+
 class Test:
     __as = 234
     _as = 345

@@ -18,16 +18,13 @@ import time
 
 from threading import Thread, active_count
 
-from microservice.core.orchestrator import Orchestrator
 from microservice.core.service_waypost import init_service_waypost
-from microservice.core import settings
 
 from microservice.examples.sleepers import sleep_1, sleep_3, sleep_5
 
 
 if __name__ == "__main__":
     init_service_waypost()
-    settings.ServiceWaypost.orchestrator_uri = Orchestrator.uri
 
     thread_results = []
 

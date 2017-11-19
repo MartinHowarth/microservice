@@ -4,18 +4,27 @@ from microservice.core import dockr, kube
 
 
 def detect_all_services() -> List[kube.KubeMicroservice]:
-    services = []
-    services.append(
+    services = [
         kube.KubeMicroservice(
             'microservice.examples.hello_world.hello_world',
-            exposed=True,
-        )
-    )
-    services.append(
+        ),
         kube.KubeMicroservice(
             'microservice.examples.hello_world.hello_other_world',
-        )
-    )
+        ),
+        kube.KubeMicroservice(
+            'microservice.examples.intensive_calculators.intensive_calculator_fanout',
+            exposed=True,
+        ),
+        kube.KubeMicroservice(
+            'microservice.examples.intensive_calculators.intensive_calculation_1',
+        ),
+        kube.KubeMicroservice(
+            'microservice.examples.intensive_calculators.intensive_calculation_2',
+        ),
+        kube.KubeMicroservice(
+            'microservice.examples.intensive_calculators.intensive_calculation_3',
+        ),
+    ]
 
     exposed = [serv for serv in services if serv.exposed]
     if len(exposed) > 1:
