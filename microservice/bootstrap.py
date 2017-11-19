@@ -8,16 +8,21 @@ def detect_all_services() -> List[kube.KubeMicroservice]:
     services.append(
         kube.KubeMicroservice(
             'microservice.examples.hello_world.hello_world',
-            exposed_port=80,
+            exposed=True,
+        )
+    )
+    services.append(
+        kube.KubeMicroservice(
+            'microservice.examples.hello_world.hello_other_world',
         )
     )
 
-    exposed_ports = [serv.exposed_port for serv in services]
-    if len(exposed_ports) != len(set(exposed_ports)):
+    exposed = [serv for serv in services if serv.exposed]
+    if len(exposed) > 1:
         raise ValueError(
-            "Every microservice must be exposed on a unique port."
+            "Only one microservice can be exposed."
             "Additional k8s ingress integration in this project is required to lift this restriction."
-            "The exposed ports are: {}".format(exposed_ports)
+            "The exposed services are: {}".format(exposed)
         )
 
     return services
