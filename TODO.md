@@ -5,16 +5,28 @@ Generally aim to implement *something* with the expectation that it could be rip
 Learn and improve!
 
 - Move to kubernetes
-    - Define dockerfile and build process for this package
-    - Create init:
-        - define set of pods
-            - one pod per microservice (so they can scale independently)
-            - optionally later we can support multi-service pods (e.g. BYO datastore for the pod)
-        - create namespace
-        - create Deployment for each microservice
-        - (later) support daemonsets for storage/stateful stuff
+    - Define build process
+    - (later) support multi-service pods (e.g. BYO datastore for the pod)
+    - (later) support daemonsets for storage/stateful stuff
     - Add "external" flag to microservice decorator
         - The kubernetes Service for this will get exposed
+- support openshift?
+- support AWS?
+- support azure?
+
+- Resolve concurrent requests problem
+    - Currently: Each MS is running flask in threaded mode - this handles one request per thread (100 threads?)
+    - Solution 1: Gunicorn
+        - Use Gunicorn in front of flask
+    - Solution 2: Move to actor model
+        - Send http req to service, but don't wait for response.
+        - Requests include a "return address"
+            - would end up chaining many of these addresses
+        - when an MS responds, it makes a request to "return address" with the result
+        - The original calling function gets called again, when instead of making a service call, the wrapper just returns the value
+        - Problem:
+            - If service call in middle of function, would need to re-run the start of the function
+                - Advise users to put these calls at the top of the function, if possible.
 
 
 - More automatic tests!

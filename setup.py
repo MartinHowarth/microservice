@@ -46,10 +46,11 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
 
     install_requires=[
-        'flask',
-        'requests',
-        'kubernetes',
+        'celery',
         'docker',
+        'flask',
+        'kubernetes',
+        'requests',
     ],
 
     entry_points={

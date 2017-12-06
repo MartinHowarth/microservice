@@ -10,6 +10,7 @@ class TestServiceHost(TestCase):
     def setUp(self):
         init_service_waypost(disable_heartbeating=True)
         settings.deployment_type = settings.DeploymentType.ZERO
+        settings.deployment_mode = settings.Mode.SYN
 
     def test_test_override(self):
         self.assertEqual(service_host.HealthChecker.heartbeat_info, {

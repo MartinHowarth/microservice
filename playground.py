@@ -2,6 +2,15 @@ import collections
 db = collections.defaultdict(dict)
 
 
+def f(a, b, *args, ab=1, bc=2, **kwargs):
+    print(a, b, args, ab, bc, kwargs)
+
+f(1, 2, 3, 4, 5, ab=2, bc=5, asdf=234)
+f(1, 2, 3, 4, 5, bc=5, asdf=234)
+f(bc=5, ab=34, *(1, 2, 3, 4, 5), asdf=234)
+
+exit()
+
 import requests
 req = requests.get(
     "http://192.168.99.100:5000/microservice.examples.hello_world.hello_world",

@@ -6,7 +6,7 @@ from microservice.core import settings
 
 def start_service():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_services", help="Comma-separated list of functions to provide as services.")
+    parser.add_argument("--service", help="Name of service.")
     parser.add_argument("--host", help="IP address to host the service on.")
     parser.add_argument("--port", help="Port to host the service on.")
     parser.add_argument("--other_kwargs")
@@ -17,12 +17,9 @@ def start_service():
     else:
         other_kwargs = {}
 
-    services = args.local_services.split(',')
-    print("This instance is providing the following services:")
-    for service in services:
-        print("\t", service)
+    print("This instance is providing the following service: {}".format(args.service))
     from microservice.core import service_host
-    service_host.initialise_microservice(services, args.host, args.port, **other_kwargs)
+    service_host.initialise_microservice(args.service, args.host, args.port, **other_kwargs)
 
 
 if __name__ == "__main__":
