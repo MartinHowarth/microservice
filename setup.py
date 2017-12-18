@@ -50,6 +50,7 @@ setup(
         'docker',
         'flask',
         'kubernetes',
+        'redis',
         'requests',
     ],
 

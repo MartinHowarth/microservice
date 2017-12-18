@@ -26,8 +26,8 @@ def microservice(func):
         # If we've already made the call to calculate this function, return that
         if settings.deployment_mode == settings.Mode.ACTOR:
             print("Call to that function already carried out - returning previous result.")
-            if service_name in settings.ServiceWaypost.current_message.results.keys():
-                return settings.ServiceWaypost.current_message.results[service_name]
+            if service_name in __message.results.keys():
+                return __message.results[service_name]
 
         if settings.deployment_mode == settings.Mode.SYN:
             ret_func = discover_function(service_name)
@@ -37,7 +37,7 @@ def microservice(func):
             communication.construct_and_send_call_to_service(
                 service_name,
                 settings.ServiceWaypost.local_service,
-                settings.ServiceWaypost.current_message,
+                __message,
                 *args,
                 **kwargs
             )

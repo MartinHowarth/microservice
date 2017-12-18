@@ -1,13 +1,22 @@
-from celery import Celery
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify
 
 from microservice.core import settings, communication
 
-app = Flask(__name__)
-app.config['CELERY_BROKER_URL'] = 'redis://0.0.0.0:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://0.0.0.0:6379/0'
-celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
-celery.conf.update(app.config)
+
+def configure_microservice():
+    """
+    Configure the flask app. If this is called a second time, it tears down the existing app and re-creates it.
+    """
+    global app, executor
+    app = Flask(__name__)
+    if settings.deployment_mode == settings.Mode.ACTOR:
+        executor = ThreadPoolExecutor(max_workers=5)
+
+
+app = None  # type: Flask
+executor = None  # type: ThreadPoolExecutor
+configure_microservice()
 
 
 class InvalidUsage(Exception):
@@ -33,28 +42,33 @@ def handle_invalid_usage(error):
     return response
 
 
-@celery.task
-def perform_service():
-    message = settings.ServiceWaypost.current_message
+def perform_service(message: communication.Message):
     # Actually carry out the service.
     try:
+        print("Calling local function")
         result = settings.ServiceWaypost.local_function(*message.args, **message.kwargs)
+        print("Result is: {}".format(result))
     except communication.ServiceCallPerformed as e:
         print(e)
+        # TODO: return the exception to the calling microservice
         return
 
-    # Send message back to calling party (which should be the last via header)
+    # Send message back to calling party (which is the last via header)
+    print("original message is: {}".format(message.to_dict))
     return_service = message.via[-1].service_name
     return_args = message.via[-1].args
     return_kwargs = message.via[-1].kwargs
+    message.results.update({
+            return_service: result
+        })
     return_message = communication.Message(
         args=return_args,
         kwargs=return_kwargs,
         via=message.via[:-1],
-        results=message.results.update({
-            return_service: result
-        }),
+        results=message.results,
     )
+    print("Return message is: {}".format(return_message.to_dict))
+    print("Return service is: {}".format(return_service))
     communication.send_message_to_service(return_service, return_message)
 
 
@@ -70,17 +84,19 @@ def add_local_service(service_name):
             req_json = {}
 
         msg = communication.Message.from_dict(req_json)
-        settings.ServiceWaypost.current_message = msg
 
         if settings.deployment_mode == settings.Mode.SYN:
             result = settings.ServiceWaypost.local_function(__message=msg)
             return jsonify({'args': result})
         elif settings.deployment_mode == settings.Mode.ACTOR:
             # Kick off the process to do the work and send the response.
-            perform_service.delay()
+            print("Submitting work to executor")
+            executor.submit(perform_service, msg)
 
+            print("Work has been scheduled")
             # Ack the request.
-            return True
+            return jsonify(True)
+        raise ValueError("Invalid deployment mode: {}".format(settings.deployment_mode))
 
     # Now expose this function at the global scope so that it persists as a new flask route.
     new_service.name = service_name
@@ -100,6 +116,7 @@ def add_local_service(service_name):
 
 def initialise_microservice(service_name, host="0.0.0.0", port="5000", **kwargs):
     from microservice.core.service_waypost import init_service_waypost
+    configure_microservice()
     init_service_waypost()
     add_local_service(service_name)
 

@@ -80,17 +80,21 @@ def send_message_to_service(service_name: str, message: Message):
     return send_message_to_uri(uri, message)
 
 
-def construct_and_send_call_to_service(target_service, local_service, inbound_message, *args, **kwargs):
+def construct_message(local_service, inbound_message, *args, **kwargs):
     via = inbound_message.via
     via.append(ViaHeader(
         local_service,
         inbound_message.args,
         inbound_message.kwargs,
     ))
-    msg = Message(
+    return Message(
         args=args,
         kwargs=kwargs,
         results=inbound_message.results,
         via=via,
     )
+
+
+def construct_and_send_call_to_service(target_service, local_service, inbound_message, *args, **kwargs):
+    msg = construct_message(local_service, inbound_message, *args, **kwargs)
     send_message_to_service(target_service, msg)

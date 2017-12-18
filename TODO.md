@@ -29,7 +29,7 @@ Learn and improve!
                 - Advise users to put these calls at the top of the function, if possible.
 
 
-- More automatic tests!
+- More automatic checks!
 - Additional testing:
     - More complicated import models
     - Interaction with other decorators
