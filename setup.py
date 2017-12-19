@@ -46,11 +46,9 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
 
     install_requires=[
-        'celery',
         'docker',
         'flask',
         'kubernetes',
-        'redis',
         'requests',
     ],
 

@@ -4,9 +4,6 @@ A set of pretty basic requirements that need implementing.
 Generally aim to implement *something* with the expectation that it could be ripped out easily.
 Learn and improve!
 
-## buglist
-- kwargs for calling back to original function come back with string keys (e.g. when the key was originally an int)
-- args are sometimes lists and sometimes tuples - make it consistent!
 
 ## featurelist
 

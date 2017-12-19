@@ -1,3 +1,5 @@
+import pickle
+
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify
 
@@ -82,16 +84,17 @@ def add_local_service(service_name):
     # Define the flask app route for this service.
     @app.route('/')
     def new_service():
-        req_json = request.get_json()
-        print("Service %s received request info:" % service_name, req_json)
-        if req_json is None:
-            req_json = {}
+        print("Service %s received request" % service_name)
+        if request.data:
+            msg = communication.Message.unpickle(request.data)
+        else:
+            msg = communication.Message()
 
-        msg = communication.Message.from_dict(req_json)
+        print("Unpickled message is: {}".format(msg))
 
         if settings.deployment_mode == settings.Mode.SYN:
             result = settings.ServiceWaypost.local_function(__message=msg)
-            return jsonify({'args': result})
+            return pickle.dumps(result)
         elif settings.deployment_mode == settings.Mode.ACTOR:
             # Kick off the process to do the work and send the response.
             print("Submitting work to executor")
@@ -99,7 +102,7 @@ def add_local_service(service_name):
 
             print("Work has been scheduled")
             # Ack the request.
-            return jsonify(True)
+            return pickle.dumps(True)
         raise ValueError("Invalid deployment mode: {}".format(settings.deployment_mode))
 
     # Now expose this function at the global scope so that it persists as a new flask route.

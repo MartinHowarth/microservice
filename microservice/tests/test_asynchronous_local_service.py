@@ -1,4 +1,4 @@
-import json
+import pickle
 import requests
 import time
 
@@ -10,6 +10,8 @@ from microservice.core.service_waypost import init_service_waypost
 
 from microservice.core import service_host
 
+from microservice.tests import microservices_for_testing
+
 
 class MockRequestResult(MagicMock):
     _json_args = (2, 3, 4)
@@ -19,8 +21,14 @@ class MockRequestResult(MagicMock):
             'args': self._json_args
         }
 
+    @property
+    def content(self):
+        return pickle.dumps(self._json_args)
+
 
 class TestAsynchronousLocalService(TestCase):
+    THREAD_TIMER = 0.1
+
     @classmethod
     def setUpClass(cls):
         settings.deployment_mode = settings.Mode.ACTOR
@@ -40,6 +48,23 @@ class TestAsynchronousLocalService(TestCase):
         self.app = service_host.app.test_client()
         self.service_name = service_name
         service_host.add_local_service(self.service_name)
+
+    def requests_get_has_pickled_calls(self, calls):
+        self.assertEqual(len(self.mocked_requests_get.mock_calls), len(calls))
+
+        for ii, cal in enumerate(calls):
+            self.assertTrue('data' in self.mocked_requests_get.mock_calls[ii][2].keys())
+            kwargs = self.mocked_requests_get.mock_calls[ii][2]
+            data = kwargs.pop('data')
+
+            expected_uri = cal[1][0]
+            expected_message = cal[1][1]
+            called_uri = self.mocked_requests_get.mock_calls[ii][1][0]
+            called_message = pickle.loads(data)
+
+            self.assertEqual(expected_uri, called_uri)
+            self.assertEqual(expected_message, called_message)
+            self.assertEqual(cal[2], kwargs)
 
     def test_request(self):
         """
@@ -62,18 +87,18 @@ class TestAsynchronousLocalService(TestCase):
 
         response = self.app.get(
             '/',
-            data=json.dumps(test_msg.to_dict),
+            data=test_msg.pickle,
             content_type='application/json')
-        result = json.loads(response.data.decode('utf-8'))
+        result = pickle.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
-        time.sleep(1)
-        self.mocked_requests_get.assert_has_calls([
+        time.sleep(self.THREAD_TIMER)
+        self.requests_get_has_pickled_calls([
             call('http://previous-service-name.pycroservices/',
-                 json={
-                     'args': [],
+                 communication.Message.from_dict({
+                     'args': (),
                      'kwargs': {},
                      'via': [],
                      'results': {
@@ -83,7 +108,7 @@ class TestAsynchronousLocalService(TestCase):
                              **self.kwargs
                          }
                      }
-                 }),
+                 })),
         ])
 
     def test_request_with_originating_args(self):
@@ -96,7 +121,7 @@ class TestAsynchronousLocalService(TestCase):
 
         previous_service_args = [1, 2, 6]
         previous_service_kwargs = {
-            '3': 6,
+            3: 6,
             'asdf': 'wryt'
         }
 
@@ -115,17 +140,17 @@ class TestAsynchronousLocalService(TestCase):
 
         response = self.app.get(
             '/',
-            data=json.dumps(test_msg.to_dict),
+            data=test_msg.pickle,
             content_type='application/json')
-        result = json.loads(response.data.decode('utf-8'))
+        result = pickle.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
-        time.sleep(1)
-        self.mocked_requests_get.assert_has_calls([
+        time.sleep(self.THREAD_TIMER)
+        self.requests_get_has_pickled_calls([
             call('http://previous-service-name.pycroservices/',
-                 json={
+                 communication.Message.from_dict({
                      'args': previous_service_args,
                      'kwargs': previous_service_kwargs,
                      'via': [],
@@ -136,7 +161,7 @@ class TestAsynchronousLocalService(TestCase):
                              **self.kwargs
                          }
                      }
-                 }),
+                 })),
         ])
 
     def test_nested_request(self):
@@ -144,7 +169,7 @@ class TestAsynchronousLocalService(TestCase):
 
         previous_service_args = (1, 2, 6)
         previous_service_kwargs = {
-            '3': 6,
+            3: 6,
             'asdf': 'wryt'
         }
         
@@ -160,24 +185,19 @@ class TestAsynchronousLocalService(TestCase):
             *self.args,
             **self.kwargs,
         )
-        print('2test', test_msg.to_dict)
-        print('2test', json.dumps(test_msg.to_dict))
-        print('2test', json.loads(json.dumps(test_msg.to_dict)))
-        print('2test', json.loads(json.dumps(test_msg.to_dict)) == test_msg.to_dict)
-
         response = self.app.get(
             '/',
-            data=json.dumps(test_msg.to_dict),
+            data=test_msg.pickle,
             content_type='application/json')
-        result = json.loads(response.data.decode('utf-8'))
+        result = pickle.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
-        time.sleep(1)
-        self.mocked_requests_get.assert_has_calls([
+        time.sleep(self.THREAD_TIMER)
+        self.requests_get_has_pickled_calls([
             call('http://rvice-tests-microservices-for-testing-echo-as-dict.pycroservices/',
-                 json={
+                 communication.Message.from_dict({
                      'args': (5, 2, 5),
                      'kwargs': {'asdf': 'asdrf'},
                      'via': [
@@ -191,7 +211,7 @@ class TestAsynchronousLocalService(TestCase):
                      'results': {
                         'other_service_name': [1, 3, 5, 7]
                      }
-                 }),
+                 })),
             ])
 
     def test_nested_call_is_not_made_if_already_calculated(self):
@@ -203,8 +223,13 @@ class TestAsynchronousLocalService(TestCase):
 
         previous_service_args = [1, 2, 6]
         previous_service_kwargs = {
-            '3': 6,
+            3: 6,
             'asdf': 'wryt'
+        }
+
+        echo_as_dict_expected_result = {
+            '_args': microservices_for_testing.echo_as_dict2_args,
+            **microservices_for_testing.echo_as_dict2_kwargs
         }
 
         test_msg = communication.construct_message(
@@ -213,10 +238,7 @@ class TestAsynchronousLocalService(TestCase):
                 args=previous_service_args,
                 kwargs=previous_service_kwargs,
                 results={
-                    'microservice.tests.microservices_for_testing.echo_as_dict': {
-                        '_args': self.args,
-                        **self.kwargs
-                    }
+                    'microservice.tests.microservices_for_testing.echo_as_dict': echo_as_dict_expected_result
                 }
             ),
             *self.args,
@@ -225,24 +247,30 @@ class TestAsynchronousLocalService(TestCase):
 
         response = self.app.get(
             '/',
-            data=json.dumps(test_msg.to_dict),
+            data=test_msg.pickle,
             content_type='application/json')
-        result = json.loads(response.data.decode('utf-8'))
+        result = pickle.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
-        time.sleep(1)
-        self.mocked_requests_get.assert_has_calls([
+        time.sleep(self.THREAD_TIMER)
+
+        self.requests_get_has_pickled_calls([
             call('http://previous-service-name.pycroservices/',
-                 json={
+                 communication.Message.from_dict({
                      'args': previous_service_args,
                      'kwargs': previous_service_kwargs,
                      'via': [],
                      'results': {
-                         'other_service_name': [1, 3, 5, 7],
-                         'previous_service_name': {'_args': self.args,
-                                                   **self.kwargs}
+                        'microservice.tests.microservices_for_testing.echo_as_dict': echo_as_dict_expected_result,
+                        'microservice.tests.microservices_for_testing.echo_as_dict2': (
+                            {
+                                '_args': self.args,
+                                **self.kwargs
+                            },
+                            echo_as_dict_expected_result,
+                        )
                      }
-                 }),
+                 })),
         ])

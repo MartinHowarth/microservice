@@ -1,3 +1,4 @@
+import pickle
 import requests
 
 from unittest import TestCase
@@ -13,6 +14,10 @@ class MockRequestResult(MagicMock):
         return {
             'args': self._json_args
         }
+
+    @property
+    def content(self):
+        return pickle.dumps(self._json_args)
 
 
 class TestCommunication(TestCase):
@@ -35,6 +40,18 @@ class TestCommunication(TestCase):
 
         self.sample_message = communication.Message(**self.sample_msg_dict)
 
+    def requests_get_has_pickled_calls(self, calls):
+        self.assertEqual(len(self.mocked_requests_get.mock_calls), len(calls))
+
+        for ii, cal in enumerate(calls):
+            self.assertTrue('data' in self.mocked_requests_get.mock_calls[ii][2].keys())
+            kwargs = self.mocked_requests_get.mock_calls[ii][2]
+            data = kwargs.pop('data')
+
+            self.assertEqual(cal[1][0], self.mocked_requests_get.mock_calls[ii][1][0])
+            self.assertEqual(cal[1][1], pickle.loads(data))
+            self.assertEqual(cal[2], kwargs)
+
     def test_send_to_uri(self):
         with self.subTest(msg="Test sending"):
             args = (5, 6, 7)
@@ -46,15 +63,15 @@ class TestCommunication(TestCase):
 
             communication.send_to_uri(__uri=uri, *args, **kwargs)
 
-            json_data_1 = {
+            expected_message = communication.Message.from_dict({
                 'args': args,
                 'kwargs': kwargs,
                 'via': [],
                 'results': {}
-            }
+            })
 
-            self.mocked_requests_get.assert_has_calls([
-                call(uri, json=json_data_1),
+            self.requests_get_has_pickled_calls([
+                call(uri, expected_message)
             ])
 
         with self.subTest(msg="Test parsing response"):
@@ -66,18 +83,23 @@ class TestCommunication(TestCase):
 
         msg = communication.Message(**msg_dict)
 
-        self.assertEqual(msg_dict, msg.to_dict)
-        self.assertEqual(msg, communication.Message.from_dict(msg_dict))
-
         self.assertEqual(msg.via[0], communication.ViaHeader(*msg_dict['via'][0]))
+
+        with self.subTest(msg="Test to and from dict"):
+            self.assertEqual(msg_dict, msg.to_dict)
+            self.assertEqual(msg, communication.Message.from_dict(msg_dict))
+
+        with self.subTest(msg="Test pickle and unpickle"):
+            pickled_unpickled = communication.Message.unpickle(msg.pickle)
+            self.assertEqual(msg, pickled_unpickled)
 
     def test_send_message_to_service(self):
         service_name = "my_service-name"
         uri = communication.uri_from_service_name(service_name)
         with self.subTest(msg="Test parsing response"):
             result = communication.send_message_to_service(service_name, self.sample_message)
-            self.mocked_requests_get.assert_has_calls([
-                call(uri, json=self.sample_msg_dict),
+            self.requests_get_has_pickled_calls([
+                call(uri, self.sample_message),
             ])
             self.assertEqual(result, MockRequestResult().json()['args'])
 

@@ -1,4 +1,4 @@
-import json
+import pickle
 from unittest import TestCase
 
 from microservice.core import settings, communication
@@ -31,21 +31,20 @@ class TestSynchronousLocalService(TestCase):
         self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict')
 
         response = self.app.get('/')
-        result = json.loads(response.data.decode('utf-8'))
+        result = pickle.loads(response.data)
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(len(result.keys()) == 1)
-        self.assertEqual(result['args'], {'_args': []})
+        self.assertEqual(result, {'_args': ()})
 
     def test_request(self):
         self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict')
 
         response = self.app.get(
             '/',
-            data=json.dumps(self.sample_message.to_dict),
+            data=self.sample_message.pickle,
             content_type='application/json')
-        result = json.loads(response.data.decode('utf-8'))
+        result = pickle.loads(response.data)
 
-        expected_result = {'args': {'_args': [1, 2, 3], 'a': 'asdf', 'b': 123}}
+        expected_result = {'_args': (1, 2, 3), 'a': 'asdf', 'b': 123}
         print(result)
 
         self.assertEqual(response.status_code, 200)

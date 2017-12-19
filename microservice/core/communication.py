@@ -39,6 +39,7 @@ class Message:
 
     @classmethod
     def unpickle(cls, msg_pickle):
+        print("failing pickle", msg_pickle)
         return pickle.loads(msg_pickle)
 
     @property
@@ -51,6 +52,12 @@ class Message:
 
         return self.to_dict == other.to_dict
 
+    def __str__(self):
+        return str(self.to_dict)
+
+    def __repr__(self):
+        return str(self)
+
 
 def send_to_uri(*args, __uri=None, **kwargs):
     json_data = {
@@ -59,10 +66,11 @@ def send_to_uri(*args, __uri=None, **kwargs):
         'via': [],
         'results': {},
     }
-    print("Sending to uri %s:" % __uri, json_data)
-    result = requests.get(__uri, json=json_data)
+    message = Message.from_dict(json_data)
+    print("Sending to uri %s:" % __uri, message)
+    result = requests.get(__uri, data=message.pickle)
     if result:
-        result = result.json()['args']
+        result = pickle.loads(result.content)
     print("Got result:", result)
     return result
 
@@ -77,9 +85,9 @@ def uri_from_service_name(service_name: str) -> str:
 
 
 def send_message_to_uri(uri: str, message: Message):
-    result = requests.get(uri, json=message.to_dict)
+    result = requests.get(uri, data=message.pickle)
     if result:
-        result = result.json()['args']
+        result = pickle.loads(result.content)
     print("Got result:", result)
     return result
 
