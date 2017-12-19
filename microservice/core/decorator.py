@@ -10,6 +10,10 @@ def microservice(func):
     def runtime_discovery(*args, __message=None, **kwargs):
         # If this is called using args and kwargs, then this is being called to trigger a remote call
         # If this is called using __message, then this has been called as part of dealing with an actor message
+        print("Received args: {}".format(args))
+        print("Received kwargs: {}".format(kwargs))
+        print("Received message: {}".format(__message))
+
         service_name = "%s.%s" % (sys.modules[func.__module__].__name__, func.__name__)
         print("Function being discovered is: {}".format(service_name))
 
@@ -25,19 +29,21 @@ def microservice(func):
         print("{} is being served remotely.".format(service_name))
         # If we've already made the call to calculate this function, return that
         if settings.deployment_mode == settings.Mode.ACTOR:
-            print("Call to that function already carried out - returning previous result.")
-            if service_name in __message.results.keys():
-                return __message.results[service_name]
+            if service_name in settings.current_message.results.keys():
+                print("Call to that function already carried out - returning previous result.")
+                return settings.current_message.results[service_name]
 
+        print("Result has not been previously calculated.")
         if settings.deployment_mode == settings.Mode.SYN:
             ret_func = discover_function(service_name)
             return ret_func(*args, **kwargs)
         elif settings.deployment_mode == settings.Mode.ACTOR:
             # Otherwise, make a call to another actor to carry it out and stop processing.
+            print("Sending request to another actor to fulfil request.")
             communication.construct_and_send_call_to_service(
                 service_name,
                 settings.ServiceWaypost.local_service,
-                __message,
+                settings.current_message,
                 *args,
                 **kwargs
             )

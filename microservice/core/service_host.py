@@ -46,11 +46,15 @@ def perform_service(message: communication.Message):
     # Actually carry out the service.
     try:
         print("Calling local function")
+        # Make the current message available globally
+        # Note that this uses `threading.local()` to ensure that this message is only available to the current thread.
+        settings.current_message = message
         result = settings.ServiceWaypost.local_function(*message.args, **message.kwargs)
         print("Result is: {}".format(result))
     except communication.ServiceCallPerformed as e:
         print(e)
         # TODO: return the exception to the calling microservice
+        raise e
         return
 
     # Send message back to calling party (which is the last via header)
@@ -59,7 +63,7 @@ def perform_service(message: communication.Message):
     return_args = message.via[-1].args
     return_kwargs = message.via[-1].kwargs
     message.results.update({
-            return_service: result
+            settings.ServiceWaypost.local_service: result
         })
     return_message = communication.Message(
         args=return_args,

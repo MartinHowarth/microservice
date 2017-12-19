@@ -1,3 +1,4 @@
+import pickle
 import requests
 
 from collections import namedtuple
@@ -35,6 +36,14 @@ class Message:
             'via': [(v.service_name, v.args, v.kwargs) for v in self.via],
             'results': self.results,
         }
+
+    @classmethod
+    def unpickle(cls, msg_pickle):
+        return pickle.loads(msg_pickle)
+
+    @property
+    def pickle(self):
+        return pickle.dumps(self)
 
     def __eq__(self, other):
         if not isinstance(other, Message):
@@ -81,20 +90,27 @@ def send_message_to_service(service_name: str, message: Message):
 
 
 def construct_message(local_service, inbound_message, *args, **kwargs):
-    via = inbound_message.via
-    via.append(ViaHeader(
-        local_service,
-        inbound_message.args,
-        inbound_message.kwargs,
-    ))
+    if inbound_message:
+        via = inbound_message.via
+        via.append(ViaHeader(
+            local_service,
+            inbound_message.args,
+            inbound_message.kwargs,
+        ))
+        results = inbound_message.results
+    else:
+        via = None
+        results = None
+
     return Message(
         args=args,
         kwargs=kwargs,
-        results=inbound_message.results,
+        results=results,
         via=via,
     )
 
 
 def construct_and_send_call_to_service(target_service, local_service, inbound_message, *args, **kwargs):
     msg = construct_message(local_service, inbound_message, *args, **kwargs)
+    print("Constructed message: {}".format(msg))
     send_message_to_service(target_service, msg)
