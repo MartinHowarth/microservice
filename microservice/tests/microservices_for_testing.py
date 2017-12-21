@@ -44,3 +44,8 @@ def echo_as_dict5(*args, **kwargs):
     ret2 = echo_as_dict2(234, 456, 345, ty="no problem")
     ret3 = echo_as_dict3(234, 456, 345, ty="no problem")
     return ret, ret2, ret3
+
+
+@microservice
+def exception_raiser(*args, **kwargs):
+    raise RuntimeError("Called with: {}; {}".format(args, kwargs))

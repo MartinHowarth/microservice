@@ -84,8 +84,9 @@ def uri_from_service_name(service_name: str) -> str:
     return uri
 
 
-def send_message_to_uri(uri: str, message: Message):
-    result = requests.get(uri, data=message.pickle)
+def send_pickled_object_to_service(service_name, pickled):
+    uri = uri_from_service_name(service_name)
+    result = requests.get(uri, data=pickled)
     if result:
         result = pickle.loads(result.content)
     print("Got result:", result)
@@ -93,8 +94,7 @@ def send_message_to_uri(uri: str, message: Message):
 
 
 def send_message_to_service(service_name: str, message: Message):
-    uri = uri_from_service_name(service_name)
-    return send_message_to_uri(uri, message)
+    return send_pickled_object_to_service(service_name, message.pickle)
 
 
 def construct_message(local_service, inbound_message, *args, **kwargs):

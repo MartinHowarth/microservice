@@ -47,7 +47,7 @@ def microservice(func):
                 *args,
                 **kwargs
             )
-            raise communication.ServiceCallPerformed("{}".format(service_name))
+            raise communication.ServiceCallPerformed("Service call performed: {}".format(service_name))
 
         raise ValueError("Invalid deployment_mode")
     return runtime_discovery

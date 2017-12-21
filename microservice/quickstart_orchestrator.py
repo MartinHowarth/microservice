@@ -1,4 +1,3 @@
-import atexit
 import json
 import subprocess
 import time
@@ -7,14 +6,6 @@ DETACHED_PROCESS = 8
 
 orchestrator_cmd = "microservice --orchestrator".split(' ')
 all_processes = []
-
-
-# TODO: This doesn't actually work by default on windows because we don't have permission to kill the detached processes
-@atexit.register
-def kill_subprocesses():
-    for proc in all_processes:
-        print("killing", proc)
-        proc.kill()
 
 
 def main(**kwargs):

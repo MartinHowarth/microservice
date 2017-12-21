@@ -58,13 +58,18 @@ class TestAsynchronousLocalService(TestCase):
             data = kwargs.pop('data')
 
             expected_uri = cal[1][0]
-            expected_message = cal[1][1]
+            expected_object = cal[1][1]
             called_uri = self.mocked_requests_get.mock_calls[ii][1][0]
-            called_message = pickle.loads(data)
+            called_object = pickle.loads(data)
 
             self.assertEqual(expected_uri, called_uri)
-            self.assertEqual(expected_message, called_message)
-            self.assertEqual(cal[2], kwargs)
+
+            if isinstance(expected_object, BaseException):
+                self.assertEqual(type(expected_object), type(called_object))
+                self.assertEqual(expected_object.args, called_object.args)
+            else:
+                self.assertEqual(expected_object, called_object)
+                self.assertEqual(cal[2], kwargs)
 
     def test_request(self):
         """
@@ -109,6 +114,40 @@ class TestAsynchronousLocalService(TestCase):
                          }
                      }
                  })),
+        ])
+
+    def test_request_resulting_in_exception(self):
+        """
+        Test that:
+         - A 200 response is received to making a request to a microservice
+         - A separate request is made back to the calling service with the result, which is an exception
+        """
+        self.mock_setup('microservice.tests.microservices_for_testing.exception_raiser')
+
+        test_msg = communication.construct_message(
+            "previous_service_name",
+            communication.Message(
+                results={
+                    'other_service_name': [1, 3, 5, 7]
+                }
+            ),
+            *self.args,
+            **self.kwargs,
+        )
+
+        response = self.app.get(
+            '/',
+            data=test_msg.pickle,
+            content_type='application/json')
+        result = pickle.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result, True)
+        # Wait for the thread pool to complete the work.
+        time.sleep(self.THREAD_TIMER)
+        self.requests_get_has_pickled_calls([
+            call('http://previous-service-name.pycroservices/',
+                 RuntimeError("Called with: {}; {}".format(self.args, self.kwargs)))
         ])
 
     def test_request_with_originating_args(self):

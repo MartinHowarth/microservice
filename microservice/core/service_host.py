@@ -45,6 +45,7 @@ def handle_invalid_usage(error):
 
 
 def perform_service(message: communication.Message):
+    return_service = message.via[-1].service_name
     # Actually carry out the service.
     try:
         print("Calling local function")
@@ -54,14 +55,15 @@ def perform_service(message: communication.Message):
         result = settings.ServiceWaypost.local_function(*message.args, **message.kwargs)
         print("Result is: {}".format(result))
     except communication.ServiceCallPerformed as e:
-        print(e)
-        # TODO: return the exception to the calling microservice
-        raise e
+        print("service call complete: {}".format(e))
+        return
+    except Exception as e:
+        print("Unexpected exception, returning to calling microservice: {}".format(e))
+        communication.send_pickled_object_to_service(return_service, pickle.dumps(e))
         return
 
     # Send message back to calling party (which is the last via header)
     print("original message is: {}".format(message.to_dict))
-    return_service = message.via[-1].service_name
     return_args = message.via[-1].args
     return_kwargs = message.via[-1].kwargs
     message.results.update({
