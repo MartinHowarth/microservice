@@ -21,8 +21,8 @@ def microservice(func):
             args = __message.args
             kwargs = __message.kwargs
 
-        if (service_name == settings.ServiceWaypost.local_service or
-                settings.deployment_type == settings.DeploymentType.ZERO):
+        if (settings.deployment_mode == settings.Mode.ZERO or
+                service_name == settings.ServiceWaypost.local_service):
             print("{} is being served locally.".format(service_name))
             return func(*args, **kwargs)
 
@@ -35,6 +35,7 @@ def microservice(func):
 
         print("Result has not been previously calculated.")
         if settings.deployment_mode == settings.Mode.SYN:
+            print("Mode is synchronous, so calculating the result locally: {}; {}".format(args, kwargs))
             ret_func = discover_function(service_name)
             return ret_func(*args, **kwargs)
         elif settings.deployment_mode == settings.Mode.ACTOR:
@@ -54,7 +55,7 @@ def microservice(func):
 
 
 def discover_function(service_name):
-    if settings.deployment_type == settings.DeploymentType.ZERO:
+    if settings.deployment_mode == settings.Mode.ZERO:
         func_name = service_name.split('.')[-1]
         mod_name = '.'.join(service_name.split('.')[:-1])
         mod = __import__(mod_name, globals(), locals(), [func_name], 0)
