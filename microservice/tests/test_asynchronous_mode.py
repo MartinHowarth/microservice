@@ -14,6 +14,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
 
     @classmethod
     def setUpClass(cls):
+        super(TestAsynchronousLocalService, cls).setUpClass()
         settings.deployment_mode = settings.Mode.ACTOR
 
         cls.args = (1, 2, 3)
@@ -25,10 +26,11 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
          - A 200 response is received to making a request to a microservice
          - A separate request is made back to the calling service with the result.
         """
+        previous_service_name = "previous_service_name"
         self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict')
 
         test_msg = communication.construct_message(
-            "previous_service_name",
+            previous_service_name,
             communication.Message(
                 results={
                     'other_service_name': [1, 3, 5, 7]
@@ -48,8 +50,8 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
         time.sleep(self.THREAD_TIMER)
-        self.requests_get_has_pickled_calls([
-            call('http://previous-service-name.pycroservices/',
+        self.mocked_send_object_to_service.assert_has_calls([
+            call(previous_service_name,
                  communication.Message.from_dict({
                      'args': (),
                      'kwargs': {},
@@ -70,10 +72,11 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
          - A 200 response is received to making a request to a microservice
          - A separate request is made back to the calling service with the result, which is an exception
         """
+        previous_service_name = "previous_service_name"
         self.mock_setup('microservice.tests.microservices_for_testing.exception_raiser')
 
         test_msg = communication.construct_message(
-            "previous_service_name",
+            previous_service_name,
             communication.Message(
                 results={
                     'other_service_name': [1, 3, 5, 7]
@@ -93,10 +96,20 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
         time.sleep(self.THREAD_TIMER)
-        self.requests_get_has_pickled_calls([
-            call('http://previous-service-name.pycroservices/',
-                 RuntimeError("Called with: {}; {}".format(self.args, self.kwargs)))
-        ])
+
+        # Python in-built comparison for exceptions doesn't work for different instances, so
+        # have to compare the arguments directly.
+        self.mocked_send_object_to_service.assert_called_once()
+
+        # Check the service name is as expected
+        self.assertEqual(previous_service_name,
+                         self.mocked_send_object_to_service.mock_calls[0][1][0])
+
+        # Check that the details of the exception are as expected
+        expected = RuntimeError("Called with: {}; {}".format(self.args, self.kwargs))
+        actual = self.mocked_send_object_to_service.mock_calls[0][1][1]
+        self.assertEqual(type(expected), type(actual))
+        self.assertEqual(expected.args, actual.args)
 
     def test_request_with_originating_args(self):
         """
@@ -104,6 +117,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
          - The call back to the originating microservice contains the args and kwargs that that microservice was
             originally called with
         """
+        previous_service_name = 'previous_service_name'
         self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict')
 
         previous_service_args = [1, 2, 6]
@@ -113,7 +127,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         }
 
         test_msg = communication.construct_message(
-            "previous_service_name",
+            previous_service_name,
             communication.Message(
                 args=previous_service_args,
                 kwargs=previous_service_kwargs,
@@ -135,8 +149,8 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
         time.sleep(self.THREAD_TIMER)
-        self.requests_get_has_pickled_calls([
-            call('http://previous-service-name.pycroservices/',
+        self.mocked_send_object_to_service.assert_has_calls([
+            call(previous_service_name,
                  communication.Message.from_dict({
                      'args': previous_service_args,
                      'kwargs': previous_service_kwargs,
@@ -152,6 +166,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         ])
 
     def test_nested_request(self):
+        nested_service_name = "microservice.tests.microservices_for_testing.echo_as_dict"
         self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict2')
 
         previous_service_args = (1, 2, 6)
@@ -182,8 +197,8 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         self.assertEqual(result, True)
         # Wait for the thread pool to complete the work.
         time.sleep(self.THREAD_TIMER)
-        self.requests_get_has_pickled_calls([
-            call('http://rvice-tests-microservices-for-testing-echo-as-dict.pycroservices/',
+        self.mocked_send_object_to_service.assert_has_calls([
+            call(nested_service_name,
                  communication.Message.from_dict({
                      'args': (5, 2, 5),
                      'kwargs': {'asdf': 'asdrf'},
@@ -206,6 +221,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         The nested service result should be stored in the `results` dict of the call back to the original
         actor, and that should be used to save calling into the nested service again.
         """
+        previous_service_name = 'previous_service_name'
         self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict2')
 
         previous_service_args = [1, 2, 6]
@@ -220,7 +236,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         }
 
         test_msg = communication.construct_message(
-            "previous_service_name",
+            previous_service_name,
             communication.Message(
                 args=previous_service_args,
                 kwargs=previous_service_kwargs,
@@ -243,8 +259,8 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         # Wait for the thread pool to complete the work.
         time.sleep(self.THREAD_TIMER)
 
-        self.requests_get_has_pickled_calls([
-            call('http://previous-service-name.pycroservices/',
+        self.mocked_send_object_to_service.assert_has_calls([
+            call(previous_service_name,
                  communication.Message.from_dict({
                      'args': previous_service_args,
                      'kwargs': previous_service_kwargs,

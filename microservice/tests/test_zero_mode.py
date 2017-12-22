@@ -7,6 +7,7 @@ from microservice.tests import microservices_for_testing
 class TestZeroMode(MicroserviceTestCase):
     @classmethod
     def setUpClass(cls):
+        super(TestZeroMode, cls).setUpClass()
         settings.deployment_mode = settings.Mode.ZERO
         cls.args = (1, 2, 3)
         cls.kwargs = {'a': 'asdf', 'b': 123}
@@ -17,7 +18,7 @@ class TestZeroMode(MicroserviceTestCase):
             **self.kwargs
         )
         self.assertEqual(result, {'_args': self.args, **self.kwargs})
-        self.mocked_requests_get.assert_has_calls([])
+        self.mocked_send_object_to_service.assert_not_called()
 
     def test_nested_request(self):
         result = microservices_for_testing.echo_as_dict2(
@@ -32,4 +33,4 @@ class TestZeroMode(MicroserviceTestCase):
         )
 
         self.assertEqual(result, expected_result)
-        self.mocked_requests_get.assert_has_calls([])
+        self.mocked_send_object_to_service.assert_not_called()

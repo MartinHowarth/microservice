@@ -5,19 +5,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from microservice.core import communication
-
-
-class MockRequestResult(MagicMock):
-    _json_args = (2, 3, 4)
-
-    def json(self):
-        return {
-            'args': self._json_args
-        }
-
-    @property
-    def content(self):
-        return pickle.dumps(self._json_args)
+from microservice.tests.microservice_test_case import MicroserviceTestCase, MockRequestResult
 
 
 class TestCommunication(TestCase):
@@ -40,43 +28,34 @@ class TestCommunication(TestCase):
 
         self.sample_message = communication.Message(**self.sample_msg_dict)
 
-    def requests_get_has_pickled_calls(self, calls):
-        self.assertEqual(len(self.mocked_requests_get.mock_calls), len(calls))
+    def test_send_object_to_service(self):
+        obj = self.sample_message
+        service_name = "sample_service_name"
+        expected_uri = communication.uri_from_service_name(service_name)
 
-        for ii, cal in enumerate(calls):
-            self.assertTrue('data' in self.mocked_requests_get.mock_calls[ii][2].keys())
-            kwargs = self.mocked_requests_get.mock_calls[ii][2]
+        result = communication.send_object_to_service(service_name, obj)
+        print(communication.send_object_to_service)
+
+        expected_object = communication.Message.from_dict(self.sample_msg_dict)
+
+        with self.subTest(msg="Check requests is called as expected"):
+            # We can't do a built-in comparison because the object is pickled before it is
+            # sent. The result of a pickle is unique for different objects, even if their contents
+            # are identical.
+            self.mocked_requests_get.assert_called_once()
+
+            self.assertTrue('data' in self.mocked_requests_get.mock_calls[0][2].keys())
+            kwargs = self.mocked_requests_get.mock_calls[0][2]
             data = kwargs.pop('data')
 
-            self.assertEqual(cal[1][0], self.mocked_requests_get.mock_calls[ii][1][0])
-            self.assertEqual(cal[1][1], pickle.loads(data))
-            self.assertEqual(cal[2], kwargs)
+            called_uri = self.mocked_requests_get.mock_calls[0][1][0]
+            called_object = pickle.loads(data)
 
-    def test_send_to_uri(self):
-        with self.subTest(msg="Test sending"):
-            args = (5, 6, 7)
-            kwargs = {
-                'apple': "tasty",
-                'banana': "loaf",
-            }
-            uri = "http://127.0.0.1:5000/test"
+            self.assertEqual(expected_uri, called_uri)
+            self.assertEqual(expected_object, called_object)
 
-            communication.send_to_uri(__uri=uri, *args, **kwargs)
-
-            expected_message = communication.Message.from_dict({
-                'args': args,
-                'kwargs': kwargs,
-                'via': [],
-                'results': {}
-            })
-
-            self.requests_get_has_pickled_calls([
-                call(uri, expected_message)
-            ])
-
-        with self.subTest(msg="Test parsing response"):
-            result = communication.send_to_uri(__uri=uri, *args, **kwargs)
-            self.assertEqual(result, MockRequestResult().json()['args'])
+        with self.subTest(msg="Check response is parsed correctly"):
+            self.assertEqual(MockRequestResult.args, result)
 
     def test_Message(self):
         msg_dict = self.sample_msg_dict
@@ -90,18 +69,9 @@ class TestCommunication(TestCase):
             self.assertEqual(msg, communication.Message.from_dict(msg_dict))
 
         with self.subTest(msg="Test pickle and unpickle"):
-            pickled_unpickled = communication.Message.unpickle(msg.pickle)
-            self.assertEqual(msg, pickled_unpickled)
-
-    def test_send_message_to_service(self):
-        service_name = "my_service-name"
-        uri = communication.uri_from_service_name(service_name)
-        with self.subTest(msg="Test parsing response"):
-            result = communication.send_message_to_service(service_name, self.sample_message)
-            self.requests_get_has_pickled_calls([
-                call(uri, self.sample_message),
-            ])
-            self.assertEqual(result, MockRequestResult().json()['args'])
+            pickled = msg.pickle
+            unpickled = communication.Message.unpickle(pickled)
+            self.assertEqual(msg, unpickled)
 
     def test_uri_from_service_name(self):
         service_name = "my_service-name"
@@ -112,8 +82,8 @@ class TestCommunication(TestCase):
         uri = communication.uri_from_service_name(service_name)
         self.assertEqual(uri, "http://ng-really-long-really-long-really-long-really-long.pycroservices/")
 
-    @patch('microservice.core.communication.send_message_to_service')
-    def test_construct_and_send_call_to_service(self, mock_send_message_to_service: MagicMock):
+    @patch('microservice.core.communication.send_object_to_service')
+    def test_construct_and_send_call_to_service(self, mock_send_object_to_service: MagicMock):
         target_service = "my-service-name"
         local_service = "local-service"
 
@@ -135,12 +105,12 @@ class TestCommunication(TestCase):
                 'results': {'previous-service': (1, 5, 7)}
             })
 
-            result_message = mock_send_message_to_service.call_args[0][1]
-            mock_send_message_to_service.assert_called_once()
-            self.assertEqual(mock_send_message_to_service.call_args[0][0], target_service)
+            result_message = mock_send_object_to_service.call_args[0][1]
+            mock_send_object_to_service.assert_called_once()
+            self.assertEqual(mock_send_object_to_service.call_args[0][0], target_service)
             self.assertEqual(result_message, expected_result)
 
-        mock_send_message_to_service.reset_mock()
+        mock_send_object_to_service.reset_mock()
         with self.subTest(msg="Test multiple vias"):
             communication.construct_and_send_call_to_service(
                 target_service,
@@ -152,9 +122,9 @@ class TestCommunication(TestCase):
 
             expected_result.via.append(communication.ViaHeader(local_service, args, kwargs))
 
-            result_message2 = mock_send_message_to_service.call_args[0][1]
+            result_message2 = mock_send_object_to_service.call_args[0][1]
             print(result_message2.to_dict)
 
-            mock_send_message_to_service.assert_called_once()
-            self.assertEqual(mock_send_message_to_service.call_args[0][0], target_service)
+            mock_send_object_to_service.assert_called_once()
+            self.assertEqual(mock_send_object_to_service.call_args[0][0], target_service)
             self.assertEqual(result_message2, expected_result)

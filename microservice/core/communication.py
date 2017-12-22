@@ -39,7 +39,6 @@ class Message:
 
     @classmethod
     def unpickle(cls, msg_pickle):
-        print("failing pickle", msg_pickle)
         return pickle.loads(msg_pickle)
 
     @property
@@ -59,22 +58,6 @@ class Message:
         return str(self)
 
 
-def send_to_uri(*args, __uri=None, **kwargs):
-    json_data = {
-        'args': args,
-        'kwargs': kwargs,
-        'via': [],
-        'results': {},
-    }
-    message = Message.from_dict(json_data)
-    print("Sending to uri %s:" % __uri, message)
-    result = requests.get(__uri, data=message.pickle)
-    if result:
-        result = pickle.loads(result.content)
-    print("Got result:", result)
-    return result
-
-
 def uri_from_service_name(service_name: str) -> str:
     kube_name = kube.sanitise_name(service_name)
     uri = 'http://{kube_name}.{namespace}/'.format(
@@ -84,17 +67,14 @@ def uri_from_service_name(service_name: str) -> str:
     return uri
 
 
-def send_pickled_object_to_service(service_name, pickled):
+def send_object_to_service(service_name, obj):
+    pickled = pickle.dumps(obj)
     uri = uri_from_service_name(service_name)
     result = requests.get(uri, data=pickled)
     if result:
         result = pickle.loads(result.content)
     print("Got result:", result)
     return result
-
-
-def send_message_to_service(service_name: str, message: Message):
-    return send_pickled_object_to_service(service_name, message.pickle)
 
 
 def construct_message(local_service, inbound_message, *args, **kwargs):
@@ -121,4 +101,4 @@ def construct_message(local_service, inbound_message, *args, **kwargs):
 def construct_and_send_call_to_service(target_service, local_service, inbound_message, *args, **kwargs):
     msg = construct_message(local_service, inbound_message, *args, **kwargs)
     print("Constructed message: {}".format(msg))
-    send_message_to_service(target_service, msg)
+    return send_object_to_service(target_service, msg)

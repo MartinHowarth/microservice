@@ -62,10 +62,13 @@ def discover_function(service_name):
         func = getattr(mod, func_name)
         return func
     else:
-        service_uri = communication.uri_from_service_name(service_name)
-        print("Service uri defined as: {}".format(service_uri))
-
         # Wrapper to call the uri (i.e. remote function)
         def ms_function(*args, **kwargs):
-            return communication.send_to_uri(__uri=service_uri, *args, **kwargs)
+            return communication.construct_and_send_call_to_service(
+                service_name,
+                settings.ServiceWaypost.local_service,
+                None,
+                *args,
+                **kwargs
+            )
         return ms_function

@@ -59,7 +59,7 @@ def perform_service(message: communication.Message):
         return
     except Exception as e:
         print("Unexpected exception, returning to calling microservice: {}".format(e))
-        communication.send_pickled_object_to_service(return_service, pickle.dumps(e))
+        communication.send_object_to_service(return_service, e)
         return
 
     # Send message back to calling party (which is the last via header)
@@ -77,7 +77,7 @@ def perform_service(message: communication.Message):
     )
     print("Return message is: {}".format(return_message.to_dict))
     print("Return service is: {}".format(return_service))
-    communication.send_message_to_service(return_service, return_message)
+    communication.send_object_to_service(return_service, return_message)
 
 
 def add_local_service(service_name):
@@ -88,7 +88,7 @@ def add_local_service(service_name):
     def new_service():
         print("Service %s received request" % service_name)
         if request.data:
-            msg = communication.Message.unpickle(request.data)
+            msg = pickle.loads(request.data)
         else:
             msg = communication.Message()
 

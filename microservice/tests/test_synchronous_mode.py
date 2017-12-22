@@ -11,6 +11,7 @@ from microservice.tests import microservices_for_testing
 class TestSynchronousLocalService(MicroserviceTestCase):
     @classmethod
     def setUpClass(cls):
+        super(TestSynchronousLocalService, cls).setUpClass()
         settings.deployment_mode = settings.Mode.SYN
 
         cls.sample_msg_dict = {
@@ -44,7 +45,9 @@ class TestSynchronousLocalService(MicroserviceTestCase):
         self.assertEqual(result, expected_result)
 
     def test_nested_request(self):
-        self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict2')
+        service_name = 'microservice.tests.microservices_for_testing.echo_as_dict2'
+        nested_service_name = 'microservice.tests.microservices_for_testing.echo_as_dict'
+        self.mock_setup(service_name)
 
         response = self.app.get(
             '/',
@@ -61,9 +64,9 @@ class TestSynchronousLocalService(MicroserviceTestCase):
         print("result is", result)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(result, expected_result)
+        self.assertEqual(expected_result, result)
 
-        self.requests_get_has_pickled_calls([
-            call('http://rvice-tests-microservices-for-testing-echo-as-dict.pycroservices/',
+        self.mocked_send_object_to_service.assert_has_calls([
+            call(nested_service_name,
                  expected_call)
         ])

@@ -1,12 +1,10 @@
 import pickle
-import requests
-
 from unittest import TestCase
 from unittest.mock import MagicMock
 
 from microservice.core.service_waypost import init_service_waypost
 
-from microservice.core import service_host
+from microservice.core import service_host, communication
 
 
 class MockRequestResult(MagicMock):
@@ -23,10 +21,18 @@ class MockRequestResult(MagicMock):
 
 
 class MicroserviceTestCase(TestCase):
+    original_send_object_to_service = None
+
     def setUp(self):
+        self.original_send_object_to_service = communication.send_object_to_service
+
         self.mocked_request_result = MockRequestResult()
-        self.mocked_requests_get = MagicMock(return_value=self.mocked_request_result)
-        requests.get = self.mocked_requests_get
+        self.mocked_send_object_to_service = MagicMock(
+            return_value=self.mocked_request_result.args)
+        communication.send_object_to_service = self.mocked_send_object_to_service
+
+    def tearDown(self):
+        communication.send_object_to_service = self.original_send_object_to_service
 
     def mock_setup(self, service_name):
         service_host.configure_microservice()
@@ -36,25 +42,3 @@ class MicroserviceTestCase(TestCase):
         self.app = service_host.app.test_client()
         self.service_name = service_name
         service_host.add_local_service(self.service_name)
-
-    def requests_get_has_pickled_calls(self, calls):
-        self.assertEqual(len(self.mocked_requests_get.mock_calls), len(calls))
-
-        for ii, cal in enumerate(calls):
-            self.assertTrue('data' in self.mocked_requests_get.mock_calls[ii][2].keys())
-            kwargs = self.mocked_requests_get.mock_calls[ii][2]
-            data = kwargs.pop('data')
-
-            expected_uri = cal[1][0]
-            expected_object = cal[1][1]
-            called_uri = self.mocked_requests_get.mock_calls[ii][1][0]
-            called_object = pickle.loads(data)
-
-            self.assertEqual(expected_uri, called_uri)
-
-            if isinstance(expected_object, BaseException):
-                self.assertEqual(type(expected_object), type(called_object))
-                self.assertEqual(expected_object.args, called_object.args)
-            else:
-                self.assertEqual(expected_object, called_object)
-                self.assertEqual(cal[2], kwargs)
