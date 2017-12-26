@@ -1,10 +1,11 @@
+import logging
 import pickle
 from unittest import TestCase
 from unittest.mock import MagicMock
 
 from microservice.core.service_waypost import init_service_waypost
 
-from microservice.core import service_host, communication
+from microservice.core import service_host, communication, microservice_logging
 
 
 class MockRequestResult(MagicMock):
@@ -22,6 +23,10 @@ class MockRequestResult(MagicMock):
 
 class MicroserviceTestCase(TestCase):
     original_send_object_to_service = None
+
+    @classmethod
+    def setUpClass(cls):
+        microservice_logging.configure_logging("TEST")
 
     def setUp(self):
         self.original_send_object_to_service = communication.send_object_to_service

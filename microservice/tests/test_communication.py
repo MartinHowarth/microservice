@@ -24,6 +24,7 @@ class TestCommunication(TestCase):
             'results': {
                 'service_name3': ('asdf', 345, 'yes')
             },
+            'request_id': 123456,
         }
 
         self.sample_message = communication.Message(**self.sample_msg_dict)

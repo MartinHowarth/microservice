@@ -29,12 +29,13 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         previous_service_name = "previous_service_name"
         self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict')
 
-        test_msg = communication.construct_message(
+        test_msg = communication.construct_message_add_via(
             previous_service_name,
             communication.Message(
                 results={
                     'other_service_name': [1, 3, 5, 7]
-                }
+                },
+                request_id=123456,
             ),
             *self.args,
             **self.kwargs,
@@ -62,7 +63,8 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
                              '_args': tuple(self.args),
                              **self.kwargs
                          }
-                     }
+                     },
+                     'request_id': 123456,
                  })),
         ])
 
@@ -75,7 +77,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
         previous_service_name = "previous_service_name"
         self.mock_setup('microservice.tests.microservices_for_testing.exception_raiser')
 
-        test_msg = communication.construct_message(
+        test_msg = communication.construct_message_add_via(
             previous_service_name,
             communication.Message(
                 results={
@@ -126,14 +128,15 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
             'asdf': 'wryt'
         }
 
-        test_msg = communication.construct_message(
+        test_msg = communication.construct_message_add_via(
             previous_service_name,
             communication.Message(
                 args=previous_service_args,
                 kwargs=previous_service_kwargs,
                 results={
                     'other_service_name': [1, 3, 5, 7]
-                }
+                },
+                request_id=123456
             ),
             *self.args,
             **self.kwargs,
@@ -161,7 +164,8 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
                              '_args': tuple(self.args),
                              **self.kwargs
                          }
-                     }
+                     },
+                     'request_id': 123456,
                  })),
         ])
 
@@ -175,14 +179,15 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
             'asdf': 'wryt'
         }
         
-        test_msg = communication.construct_message(
+        test_msg = communication.construct_message_add_via(
             "previous_service_name",
             communication.Message(
                 args=previous_service_args,
                 kwargs=previous_service_kwargs,
                 results={
                     'other_service_name': [1, 3, 5, 7]
-                }
+                },
+                request_id=123456
             ),
             *self.args,
             **self.kwargs,
@@ -212,7 +217,8 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
                      ],
                      'results': {
                         'other_service_name': [1, 3, 5, 7]
-                     }
+                     },
+                     'request_id': 123456,
                  })),
             ])
 
@@ -235,14 +241,15 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
             **microservices_for_testing.echo_as_dict2_kwargs
         }
 
-        test_msg = communication.construct_message(
+        test_msg = communication.construct_message_add_via(
             previous_service_name,
             communication.Message(
                 args=previous_service_args,
                 kwargs=previous_service_kwargs,
                 results={
                     'microservice.tests.microservices_for_testing.echo_as_dict': echo_as_dict_expected_result
-                }
+                },
+                request_id=123456
             ),
             *self.args,
             **self.kwargs,
@@ -274,6 +281,7 @@ class TestAsynchronousLocalService(MicroserviceTestCase):
                             },
                             echo_as_dict_expected_result,
                         )
-                     }
+                     },
+                     'request_id': 123456,
                  })),
         ])

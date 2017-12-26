@@ -48,7 +48,10 @@ setup(
     install_requires=[
         'docker',
         'flask',
+        'fluent-logger',
         'kubernetes',
+        'logstash_formatter',
+        'python-logstash-async'
         'requests',
     ],
 

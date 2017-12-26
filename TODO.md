@@ -10,6 +10,9 @@ Learn and improve!
 ### next up
 - docker build process
 - Distributed logging
+    - log formatting done, but specific sinks of those logs untested:
+        - test fluentd logging works
+        - test logstash logging works
 - interface from non-MS to MS
     - e.g. translation from standard HTTP API to this message-based microservices api
 - auto-deploy microservices (for deployment to k8s)

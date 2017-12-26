@@ -1,4 +1,8 @@
+import logging
+
 from microservice.core import settings
+
+logger = logging.getLogger(__name__)
 
 
 class _ServiceWaypost:
@@ -16,3 +20,4 @@ class _ServiceWaypost:
 
 def init_service_waypost():
     settings.ServiceWaypost = _ServiceWaypost()
+    logger.info("Service waypost initialised")

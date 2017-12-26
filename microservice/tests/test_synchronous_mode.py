@@ -17,6 +17,7 @@ class TestSynchronousLocalService(MicroserviceTestCase):
         cls.sample_msg_dict = {
             'args': (1, 2, 3),
             'kwargs': {'a': 'asdf', 'b': 123},
+            'request_id': 123456,
         }
 
         cls.sample_message = communication.Message.from_dict(cls.sample_msg_dict)
