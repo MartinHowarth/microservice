@@ -79,9 +79,15 @@ def configure_logging(service_name):
         file_handler.addFilter(RequestIDLogFilter())
         logger.addHandler(file_handler)
 
-    if settings.LoggingMode.STDOUT in settings.logging_modes:
+    if settings.LoggingMode.HUMAN in settings.logging_modes:
         stdout_handler = logging.StreamHandler(sys.stdout)
         stdout_handler.setFormatter(HumanReadableLogstashFormatter(**formatter_kwargs))
+        stdout_handler.addFilter(RequestIDLogFilter())
+        logger.addHandler(stdout_handler)
+
+    if settings.LoggingMode.STDOUT in settings.logging_modes:
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setFormatter(formatter)
         stdout_handler.addFilter(RequestIDLogFilter())
         logger.addHandler(stdout_handler)
 
@@ -98,7 +104,7 @@ def configure_logging(service_name):
         # TODO: test this
         raise Exception("Warning: untested")
         fluentd_handler = handler.FluentHandler(
-            'app.follow',
+            'pycroservices.follow',
             **settings.fluentd_settings,
             buffer_overflow_handler=overflow_handler)
         fluentd_handler.setFormatter(formatter)

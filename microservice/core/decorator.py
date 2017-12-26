@@ -34,8 +34,8 @@ def microservice(func):
         logger.info("{service_name} is being served remotely.", extra={'service_name': service_name})
         # If we've already made the call to calculate this function, return that
         if settings.deployment_mode == settings.Mode.ACTOR:
-            if service_name in settings.thread_locals.current_message.results.keys():
-                result = settings.thread_locals.current_message.results[service_name]
+            if service_name in settings.current_message().results.keys():
+                result = settings.current_message().results[service_name]
                 logger.info("Call to that function already carried out - returning previous result: {result}",
                             extra={'result': result})
                 return result
@@ -51,7 +51,7 @@ def microservice(func):
             communication.construct_and_send_call_to_service(
                 service_name,
                 settings.ServiceWaypost.local_service,
-                settings.thread_locals.current_message,
+                settings.current_message(),
                 *args,
                 **kwargs
             )
@@ -78,7 +78,7 @@ def synchronous_function(service_name):
             result = communication.construct_and_send_call_to_service(
                 service_name,
                 settings.ServiceWaypost.local_service,
-                None,
+                settings.current_message(),
                 *args,
                 **kwargs
             )

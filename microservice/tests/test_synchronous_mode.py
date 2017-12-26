@@ -57,8 +57,10 @@ class TestSynchronousLocalService(MicroserviceTestCase):
         result = pickle.loads(response.data)
 
         expected_call = communication.Message(**{
+            'via': [('microservice.tests.microservices_for_testing.echo_as_dict2', (1, 2, 3), {'a': 'asdf', 'b': 123})],
             'args': microservices_for_testing.echo_as_dict2_args,
-            'kwargs': microservices_for_testing.echo_as_dict2_kwargs
+            'kwargs': microservices_for_testing.echo_as_dict2_kwargs,
+            'request_id': 123456,
         })
         expected_result = ({'_args': self.sample_message.args, **self.sample_message.kwargs},
                            MockRequestResult.args)

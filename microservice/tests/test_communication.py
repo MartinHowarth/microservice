@@ -94,7 +94,7 @@ class TestCommunication(TestCase):
             communication.construct_and_send_call_to_service(
                 target_service,
                 local_service,
-                communication.Message(results={'previous-service': (1, 5, 7)}),
+                communication.Message(results={'previous-service': (1, 5, 7)}, request_id=123456),
                 *args,
                 **kwargs,
             )
@@ -103,7 +103,8 @@ class TestCommunication(TestCase):
                 'args': self.sample_msg_dict['args'],
                 'kwargs': self.sample_msg_dict['kwargs'],
                 'via': [communication.ViaHeader(local_service, tuple(), {})],
-                'results': {'previous-service': (1, 5, 7)}
+                'results': {'previous-service': (1, 5, 7)},
+                'request_id': self.sample_msg_dict['request_id']
             })
 
             result_message = mock_send_object_to_service.call_args[0][1]
@@ -124,7 +125,6 @@ class TestCommunication(TestCase):
             expected_result.via.append(communication.ViaHeader(local_service, args, kwargs))
 
             result_message2 = mock_send_object_to_service.call_args[0][1]
-            print(result_message2.to_dict)
 
             mock_send_object_to_service.assert_called_once()
             self.assertEqual(mock_send_object_to_service.call_args[0][0], target_service)

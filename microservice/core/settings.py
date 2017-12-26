@@ -11,6 +11,7 @@ class Mode(enum.Enum):
 
 
 class LoggingMode(enum.Enum):
+    HUMAN = "HUMAN"
     STDOUT = "STDOUT"
     FILE = "FILE"
     FLUENTD = "FLUENTD"
@@ -28,13 +29,20 @@ ServiceWaypost = None  # type: _ServiceWaypost
 thread_locals = threading.local()
 
 
-def current_request_id():
+def current_message():
     if deployment_mode == Mode.SYN:
         if flask.has_app_context() and 'current_message' in flask.g:
-            return flask.g.current_message.request_id
+            return flask.g.current_message
     elif deployment_mode == Mode.ACTOR:
         if hasattr(thread_locals, "current_message") and thread_locals.current_message is not None:
-            return thread_locals.current_message.request_id
+            return thread_locals.current_message
+    return None
+
+
+def current_request_id():
+    msg = current_message()
+    if msg is not None:
+        return msg.request_id
     return None
 
 
@@ -43,7 +51,6 @@ logging_level = logging.DEBUG
 
 logging_modes = [
     LoggingMode.STDOUT,
-    LoggingMode.FILE,
 ]
 
 fluentd_settings = {

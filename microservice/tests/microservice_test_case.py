@@ -1,5 +1,5 @@
-import logging
 import pickle
+
 from unittest import TestCase
 from unittest.mock import MagicMock
 
