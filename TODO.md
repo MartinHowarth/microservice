@@ -9,10 +9,7 @@ Learn and improve!
 
 ### next up
 - docker build process
-- Distributed logging
-    - log formatting done, but specific sinks of those logs untested:
-        - test fluentd logging works
-        - test logstash logging works
+- Test EFK stack integration
 - interface from non-MS to MS
     - e.g. translation from standard HTTP API to this message-based microservices api
 - auto-deploy microservices (for deployment to k8s)
@@ -78,8 +75,12 @@ Learn and improve!
         - RESTful way to represent objects.
             - These objects are stored in the DB, and the uri to refer to them is passed around instead of the object itself.
 
-# Future improvements
-These are mostly ide
+# WIBNIs
+
+- Distributed logging direct to fluentd / logstash
+    - log formatting done, but specific sinks of those logs untested:
+        - test fluentd logging works
+        - test logstash logging works
 
 
 ## Performance!
