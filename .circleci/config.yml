@@ -21,6 +21,13 @@ jobs:
       - checkout
 
       - run:
+          name: install prerequisites
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -U setuptools
+
+      - run:
           name: install dependencies
           command: |
             python3 -m venv venv
