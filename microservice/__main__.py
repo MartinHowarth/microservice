@@ -1,12 +1,15 @@
 import argparse
 import json
+import logging
 
-from microservice.core import settings
+from microservice.core.microservice_logging import configure_logging
+
+logger = logging.getLogger(__name__)
 
 
 def start_service():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_services", help="Comma-separated list of functions to provide as services.")
+    parser.add_argument("--service", help="Name of service.")
     parser.add_argument("--host", help="IP address to host the service on.")
     parser.add_argument("--port", help="Port to host the service on.")
     parser.add_argument("--other_kwargs")
@@ -17,13 +20,17 @@ def start_service():
     else:
         other_kwargs = {}
 
-    services = args.local_services.split(',')
-    print("This instance is providing the following services:")
-    for service in services:
-        print("\t", service)
+    configure_logging(args.service)
+
+    logger.info("This instance is providing the following service: {service_name}",
+                extra={'service_name': args.service})
     from microservice.core import service_host
-    service_host.initialise_microservice(services, args.host, args.port, **other_kwargs)
+    service_host.initialise_microservice(args.service, args.host, args.port, **other_kwargs)
 
 
 if __name__ == "__main__":
     start_service()
+
+    # TODO: IMPORTANT: before program termination, close the fluentd logging handler
+    # But at the moment, we only close when crashing, so defer.
+    # h.close()

@@ -46,10 +46,13 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
 
     install_requires=[
-        'flask',
-        'requests',
-        'kubernetes',
         'docker',
+        'flask',
+        'fluent-logger',
+        'kubernetes',
+        'logstash_formatter',
+        'python-logstash-async'
+        'requests',
     ],
 
     entry_points={

@@ -15,7 +15,7 @@ RUN git clone https://github.com/MartinHowarth/microservice.git \
   && cd microservice \
   && pip install --no-cache-dir -r requirements.txt
 
-ENTRYPOINT ["/usr/local/bin/microservice", "--host", "0.0.0.0", "--port", "5000", "--local_services"]
+ENTRYPOINT ["/usr/local/bin/microservice", "--host", "0.0.0.0", "--port", "5000", "--service"]
 """
 
 pycroservice_dockerfile = """
