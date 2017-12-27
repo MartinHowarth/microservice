@@ -51,7 +51,7 @@ setup(
         'fluent-logger',
         'kubernetes',
         'logstash_formatter',
-        'python-logstash-async'
+        'python-logstash-async',
         'requests',
     ],
 
