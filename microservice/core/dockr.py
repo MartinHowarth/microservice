@@ -19,7 +19,7 @@ ENTRYPOINT ["/usr/local/bin/microservice", "--host", "0.0.0.0", "--port", "5000"
 """
 
 pycroservice_dockerfile = """
-FROM pycroservice:latest
+FROM martinhowarth/microservice:latest
 
 CMD ["{service_name}"]
 """
@@ -58,11 +58,11 @@ def build_all_images(service_names: List[str]) -> None:
     :param service_names: List of service names.
     """
     # Build the base image first
-    build_image(
-        base_dockerfile,
-        'pycroservice:latest',
-        pull=True,  # Pull updates to the base image
-    )
+    # build_image(
+    #     base_dockerfile,
+    #     'pycroservice:latest',
+    #     pull=True,  # Pull updates to the base image
+    # )
 
     for service_name in service_names:
         build_image(

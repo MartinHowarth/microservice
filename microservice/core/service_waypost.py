@@ -17,6 +17,12 @@ class _ServiceWaypost:
 
     current_message = None
 
+    deployment = None
+
+    deployment_manager_uri = None
+
+    service_uris = dict()
+
 
 def init_service_waypost():
     settings.ServiceWaypost = _ServiceWaypost()

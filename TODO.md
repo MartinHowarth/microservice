@@ -8,11 +8,43 @@ Learn and improve!
 ## featurelist
 
 ### next up
-- docker build process
+- automatic microservice discovery
+    - Easy one is to import (and require import) of all modules where an MS is defined
+    - is there a better way?
+
+- test interface in:
+    - zero mode
+    - synchronous mode
+
+- test concurrent requests (sync and async)
+    - should work
+    - thread locals are working (no bleeding over of requests)
+
+- improve settings
+    - improve idempotency for tests
+        - maybe a "reset all" function
+    - make settings settings again!
+        - There shouldn't be functions in there?
+
+- Add service discovery for interface to discover location of remote service in k8s deployment mode
+    - because can't rely on k8s dns
+    - may also want to have multiple locations (e.g. multiple hosts, local or remote)
+- Test the ability to host the microservices in k8s, but the interface separately
+    - that means we can't rely on k8s dns for routing.
+    - Instead need to set the via headers in the message to the actual host and port.
+    - Also want to support specifying the interface return address.
+
+- define build/deployment process for actual users
 - Test EFK stack integration
 - interface from non-MS to MS
     - e.g. translation from standard HTTP API to this message-based microservices api
 - auto-deploy microservices (for deployment to k8s)
+
+- refactor to make the code structure make more sense
+    - update docs
+        - docstrings
+        - help
+        - design
 
 ### general
 - Move to kubernetes
@@ -30,10 +62,18 @@ Learn and improve!
         - Advise users to put calls to other microservices at the top of the function, if possible.
     - probably also want gunicorn?
 
+
 - Docs
     - Improve docstrings
     - Create examples
     - update README
+
+- Improve exception handling
+    - Currently, we get a bunch of catch/reraise frames added for each microservice that an exception travelled through
+    - It would be nice for end users to strip out these exception frames, so they only see what is relevant to them
+    - Overall, that means they'd see ~identical exceptions in ZERO and ACTOR modes
+    - Note that jinja2 does something like this, I think: https://github.com/pallets/jinja/blob/5b498453b5898257b2287f14ef6c363799f1405a/jinja2/debug.py
+        - It's horrible and hacky but... maybe worth it.
 
 - Add storage
     - Short term "ephemeral" storage - fast access required

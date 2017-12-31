@@ -1,3 +1,5 @@
+import sys
+
 from microservice.core.decorator import microservice
 
 
@@ -49,3 +51,13 @@ def echo_as_dict5(*args, **kwargs):
 @microservice
 def exception_raiser(*args, **kwargs):
     raise RuntimeError("Called with: {}; {}".format(args, kwargs))
+
+
+all_test_microservices = [
+    'microservice.tests.microservices_for_testing.echo_as_dict',
+    'microservice.tests.microservices_for_testing.echo_as_dict2',
+    'microservice.tests.microservices_for_testing.echo_as_dict3',
+    'microservice.tests.microservices_for_testing.echo_as_dict4',
+    'microservice.tests.microservices_for_testing.echo_as_dict5',
+    'microservice.tests.microservices_for_testing.exception_raiser',
+]

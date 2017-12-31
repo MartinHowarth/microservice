@@ -35,15 +35,21 @@ class MicroserviceTestCase(TestCase):
         self.mocked_send_object_to_service = MagicMock(
             return_value=self.mocked_request_result.args)
         communication.send_object_to_service = self.mocked_send_object_to_service
+        
+        self.request_id = 123456
+        self.original_generate_request_id = communication.generate_request_id
+        self.mocked_generate_request_id = MagicMock(return_value=self.request_id)
+        communication.generate_request_id = self.mocked_generate_request_id
 
     def tearDown(self):
         communication.send_object_to_service = self.original_send_object_to_service
+        communication.generate_request_id = self.original_generate_request_id
 
-    def mock_setup(self, service_name):
+    def mock_setup(self, service_name, interface=False):
         service_host.configure_microservice()
         init_service_waypost()
 
         service_host.app.testing = True
         self.app = service_host.app.test_client()
         self.service_name = service_name
-        service_host.add_local_service(self.service_name)
+        service_host.add_local_service(self.service_name, no_local_function=interface)

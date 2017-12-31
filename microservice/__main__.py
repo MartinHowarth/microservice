@@ -26,6 +26,7 @@ def start_service():
                 extra={'service_name': args.service})
     from microservice.core import service_host
     service_host.initialise_microservice(args.service, args.host, args.port, **other_kwargs)
+    input("Enter to exit")
 
 
 if __name__ == "__main__":

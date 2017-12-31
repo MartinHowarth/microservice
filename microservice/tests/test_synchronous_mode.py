@@ -12,7 +12,9 @@ class TestSynchronousLocalService(MicroserviceTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestSynchronousLocalService, cls).setUpClass()
-        settings.deployment_mode = settings.Mode.SYN
+        settings.communication_mode = settings.CommunicationMode.SYN
+        settings.deployment_mode = settings.DeploymentMode.KUBERNETES
+        settings.local_uri = None
 
         cls.sample_msg_dict = {
             'args': (1, 2, 3),
@@ -23,15 +25,19 @@ class TestSynchronousLocalService(MicroserviceTestCase):
         cls.sample_message = communication.Message.from_dict(cls.sample_msg_dict)
 
     def test_blank_request(self):
-        self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict')
+        local_service_name = 'microservice.tests.microservices_for_testing.echo_as_dict'
+        self.mock_setup(local_service_name)
 
         response = self.app.get('/')
         result = pickle.loads(response.data)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(result, {'_args': ()})
+        self.assertEqual(result, communication.Message(
+            results={local_service_name: {'_args': tuple()}}
+        ))
 
     def test_request(self):
-        self.mock_setup('microservice.tests.microservices_for_testing.echo_as_dict')
+        local_service_name = 'microservice.tests.microservices_for_testing.echo_as_dict'
+        self.mock_setup(local_service_name)
 
         response = self.app.get(
             '/',
@@ -39,8 +45,9 @@ class TestSynchronousLocalService(MicroserviceTestCase):
             content_type='application/json')
         result = pickle.loads(response.data)
 
-        expected_result = {'_args': (1, 2, 3), 'a': 'asdf', 'b': 123}
-        print(result)
+        expected_result = communication.Message(
+            results={local_service_name: {'_args': (1, 2, 3), 'a': 'asdf', 'b': 123}}
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(result, expected_result)
@@ -62,9 +69,12 @@ class TestSynchronousLocalService(MicroserviceTestCase):
             'kwargs': microservices_for_testing.echo_as_dict2_kwargs,
             'request_id': 123456,
         })
-        expected_result = ({'_args': self.sample_message.args, **self.sample_message.kwargs},
-                           MockRequestResult.args)
-        print("result is", result)
+        expected_result = communication.Message(
+            results={
+                service_name: ({'_args': self.sample_message.args, **self.sample_message.kwargs},
+                               MockRequestResult.args)
+            }
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(expected_result, result)
@@ -73,3 +83,18 @@ class TestSynchronousLocalService(MicroserviceTestCase):
             call(nested_service_name,
                  expected_call)
         ])
+
+    def test_exception_raised(self):
+        local_service_name = 'microservice.tests.microservices_for_testing.exception_raiser'
+        self.mock_setup(local_service_name)
+
+        response = self.app.get(
+            '/',
+            data=self.sample_message.pickle,
+            content_type='application/json')
+        result_message = pickle.loads(response.data)
+
+        expected = RuntimeError("Called with: {}; {}".format(self.sample_message.args, self.sample_message.kwargs))
+        actual = result_message.results[local_service_name]
+        self.assertEqual(type(expected), type(actual))
+        self.assertEqual(expected.args, actual.args)

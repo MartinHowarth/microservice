@@ -1,5 +1,9 @@
 # microservice
 
+## Show me some examples!
+See the example project here:
+https://github.com/MartinHowarth/microservice_example_project
+
 # Quickstart
 ## Minikube
 Installation instructions here: https://github.com/kubernetes/minikube
@@ -18,3 +22,10 @@ minikube addons open heapster
 timeout 600
 minikube addons open efk
 ```
+
+# CI
+Test pipeline hosted here:
+https://circleci.com/gh/MartinHowarth/microservice/
+
+Dockerfile build hosted bere:
+https://hub.docker.com/r/martinhowarth/microservice

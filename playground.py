@@ -1,108 +1,31 @@
-import collections
-db = collections.defaultdict(dict)
-
-
-def f(a, b, *args, ab=1, bc=2, **kwargs):
-    print(a, b, args, ab, bc, kwargs)
-
-f(1, 2, 3, 4, 5, ab=2, bc=5, asdf=234)
-f(1, 2, 3, 4, 5, bc=5, asdf=234)
-f(bc=5, ab=34, *(1, 2, 3, 4, 5), asdf=234)
-
-exit()
-
+import enum
+import pickle
 import requests
-req = requests.get(
-    "http://192.168.99.100:5000/microservice.examples.hello_world.hello_world",
-    json={
-        '_args': tuple(),
-        '_kwargs': {},
-    }
-)
-print(req)
-print(req.text)
+from time import sleep
 
-exit()
+from microservice.core.communication import Message, send_object_to_service
+from microservice.core.subprocess_deployment import SubprocessDeployment
 
 
-class Test:
-    __as = 234
-    _as = 345
-    a = "aa"
-    b = "bb"
-
-    def __init__(self):
-        self._my_prop = "my_prop_base"
-
-    def func(self):
-        return 234
-
-    def func2(self):
-        return self.a
-
-    @property
-    def my_prop(self):
-        return self._my_prop
-
-    @my_prop.setter
-    def my_prop(self, value):
-        self._my_prop = value
-
-    def __getattribute__(self, item):
-        print("getting_base %s" % item)
-        orig = super(Test, self).__getattribute__(item)
-        return orig
+microservices = [
+    'microservice.tests.microservices_for_testing.echo_as_dict',
+    'microservice.tests.microservices_for_testing.echo_as_dict2',
+    'microservice.tests.microservices_for_testing.echo_as_dict3',
+    'microservice.tests.microservices_for_testing.echo_as_dict4',
+    'microservice.tests.microservices_for_testing.echo_as_dict5',
+    'microservice.tests.microservices_for_testing.exception_raiser',
+]
 
 
-class Override(Test):
-    __uri = "uri1"
+with SubprocessDeployment(microservices) as depl:
+    print(depl.all_microservices_are_alive())
 
-    def __init__(self, *args, **kwargs):
-        print("here")
-        print(dir(self))
-        print(self.__asd)
-        for attr in [at for at in dir(self) if '__' not in at]:
-            value = getattr(super(Override, self), attr)
-            print(attr, value)
-            db[self.__uri][attr] = value
-        super(Override, self).__init__(*args, **kwargs)
+    resp = requests.get(depl.uri_for_service('microservice.tests.microservices_for_testing.exception_raiser') + 'echo')
+    print(resp.text)
 
-    def __getattribute__(self, item):
-        if item.startswith('_Override__'):
-            return
-        orig = super(Override, self).__getattribute__(item)
-        if callable(orig):
-            return orig
-        print("getting %s" % item)
-        return db[self.__uri].get(item, "non existent")
+    print([resp.text for resp in depl.send_request_to_all_services('deployment_mode').values()])
+    print([resp.text for resp in depl.send_request_to_all_services('deployment_manager_uri').values()])
 
-    def __setattr__(self, key, value):
-        super(Override, self).__setattr__(key, value)
-        print("setting %s: %s" % (key, value))
-        if key.startswith('__'):
-            return
-        # Get the value after setting it so that any properties in the super class get run first.
-        db[self.__uri][key] = getattr(super(Override, self), key)
+    sleep(10)
 
-# t = Test()
-#
-# print(t)
-# print(t.a)
-# print(t.b)
-# print(t.func)
-# print(t.func())
-# print(t._my_prop)
-# print(t._as)
-# print(t.__as)
-# exit()
 
-t = Override()
-
-print(t)
-print(t.a)
-print(t.b)
-print(t.func)
-print(t.func())
-print(t.func2())
-print(t._my_prop)
-print(t.__as)

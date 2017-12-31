@@ -5,12 +5,13 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from microservice.core import communication
-from microservice.tests.microservice_test_case import MicroserviceTestCase, MockRequestResult
+from microservice.tests.microservice_test_case import MockRequestResult
 
 
 class TestCommunication(TestCase):
     def setUp(self):
         self.mocked_request_result = MockRequestResult()
+        self.original_requests_get = requests.get
         self.mocked_requests_get = MagicMock(return_value=self.mocked_request_result)
         requests.get = self.mocked_requests_get
 
@@ -29,13 +30,16 @@ class TestCommunication(TestCase):
 
         self.sample_message = communication.Message(**self.sample_msg_dict)
 
+    def tearDown(self):
+        requests.get = self.original_requests_get
+
+    @patch('microservice.core.communication.uri_from_service_name', new=MagicMock(return_value="dummy_uri"))
     def test_send_object_to_service(self):
         obj = self.sample_message
         service_name = "sample_service_name"
         expected_uri = communication.uri_from_service_name(service_name)
 
         result = communication.send_object_to_service(service_name, obj)
-        print(communication.send_object_to_service)
 
         expected_object = communication.Message.from_dict(self.sample_msg_dict)
 
@@ -58,6 +62,34 @@ class TestCommunication(TestCase):
         with self.subTest(msg="Check response is parsed correctly"):
             self.assertEqual(MockRequestResult.args, result)
 
+        self.mocked_requests_get.reset_mock()
+
+    def test_send_object_to_service_with_overridden_uri(self):
+        """
+        Identical to `test_send_object_to_service`, but specifies a uri (http) rather than a service_name.
+        Ensure that the request is sent to the given uri, rather than a uri calculated from the service_name.
+        """
+        obj = self.sample_message
+        override_uri = 'http://123.123.123.123:2345/'
+
+        communication.send_object_to_service(override_uri, obj)
+
+        expected_object = communication.Message.from_dict(self.sample_msg_dict)
+
+        self.mocked_requests_get.assert_called_once()
+
+        self.assertTrue('data' in self.mocked_requests_get.mock_calls[0][2].keys())
+        kwargs = self.mocked_requests_get.mock_calls[0][2]
+        data = kwargs.pop('data')
+
+        called_uri = self.mocked_requests_get.mock_calls[0][1][0]
+        called_object = pickle.loads(data)
+
+        self.assertEqual(override_uri, called_uri)
+        self.assertEqual(expected_object, called_object)
+
+        self.mocked_requests_get.reset_mock()
+
     def test_Message(self):
         msg_dict = self.sample_msg_dict
 
@@ -75,6 +107,8 @@ class TestCommunication(TestCase):
             self.assertEqual(msg, unpickled)
 
     def test_uri_from_service_name(self):
+        # TODO: move this to a test of the kubernetes deployment.
+        raise NotImplementedError("Move to k8s deployment testing.")
         service_name = "my_service-name"
         uri = communication.uri_from_service_name(service_name)
         self.assertEqual(uri, "http://my-service-name.pycroservices/")
@@ -84,16 +118,16 @@ class TestCommunication(TestCase):
         self.assertEqual(uri, "http://ng-really-long-really-long-really-long-really-long.pycroservices/")
 
     @patch('microservice.core.communication.send_object_to_service')
+    @patch('microservice.core.communication.get_local_uri', new=MagicMock(return_value='local-service'))
     def test_construct_and_send_call_to_service(self, mock_send_object_to_service: MagicMock):
         target_service = "my-service-name"
         local_service = "local-service"
 
         with self.subTest(msg="Test basic message creation"):
-            args = self.sample_msg_dict['args']
+            args = self.sample_msg_dict['args']  # type: tuple
             kwargs = self.sample_msg_dict['kwargs']  # type: dict
             communication.construct_and_send_call_to_service(
                 target_service,
-                local_service,
                 communication.Message(results={'previous-service': (1, 5, 7)}, request_id=123456),
                 *args,
                 **kwargs,
@@ -116,7 +150,6 @@ class TestCommunication(TestCase):
         with self.subTest(msg="Test multiple vias"):
             communication.construct_and_send_call_to_service(
                 target_service,
-                local_service,
                 result_message,
                 *args,
                 **kwargs,

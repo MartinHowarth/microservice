@@ -8,7 +8,7 @@ class TestZeroMode(MicroserviceTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestZeroMode, cls).setUpClass()
-        settings.deployment_mode = settings.Mode.ZERO
+        settings.deployment_mode = settings.DeploymentMode.ZERO
         cls.args = (1, 2, 3)
         cls.kwargs = {'a': 'asdf', 'b': 123}
 
@@ -34,3 +34,7 @@ class TestZeroMode(MicroserviceTestCase):
 
         self.assertEqual(result, expected_result)
         self.mocked_send_object_to_service.assert_not_called()
+
+    def test_exception_raised(self):
+        with self.assertRaises(RuntimeError):
+            microservices_for_testing.exception_raiser()

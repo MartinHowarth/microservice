@@ -7,6 +7,15 @@ from microservice.core.settings import kube_namespace
 kube_api_configuration = None
 
 
+def uri_for_service(service_name):
+    kube_name = sanitise_name(service_name)
+    uri = 'http://{kube_name}.{namespace}/'.format(
+        kube_name=kube_name,
+        namespace=kube_namespace,
+    )
+    return uri
+
+
 def sanitise_name(name: str) -> str:
     """
     Change given service name into k8s compatible name, including:

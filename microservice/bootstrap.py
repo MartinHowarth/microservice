@@ -41,12 +41,12 @@ def main():
     all_services = detect_all_services()
 
     # Create all the required docker images
-    # dockr.build_all_images([service.raw_name for service in all_services])
+    dockr.build_all_images([service.raw_name for service in all_services])
 
     # Build up the k8s deployment
-    kube.pycroservice_init()
-    for service in all_services:
-        service.deploy()
+    # kube.pycroservice_init()
+    # for service in all_services:
+    #     service.deploy()
 
 
 if __name__ == "__main__":
