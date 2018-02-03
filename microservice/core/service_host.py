@@ -81,7 +81,7 @@ def carry_out_local_service(message: communication.Message):
     return result
 
 
-def perform_service(message: communication.Message):
+def perform_service_async(message: communication.Message):
     if message.via:
         return_service = message.via[-1].service_name
     else:
@@ -156,7 +156,7 @@ def add_local_service(service_name, no_local_function=False):
 
             # Unlike the synchronous mode, we don't set the current_message variable here because we're
             # going to handle it using thread locals in the async call.
-            executor.submit(perform_service, msg)
+            executor.submit(perform_service_async, msg)
 
             logger.debug("Asynchronous request has been scheduled.")
             # Ack the request.

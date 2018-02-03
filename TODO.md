@@ -17,7 +17,8 @@ Learn and improve!
     - synchronous mode
 
 - test concurrent requests (sync and async)
-    - should work
+    - works when run manually
+    - add automatic checks
     - thread locals are working (no bleeding over of requests)
 
 - improve settings
@@ -35,10 +36,8 @@ Learn and improve!
     - Also want to support specifying the interface return address.
 
 - define build/deployment process for actual users
+    - for k8s
 - Test EFK stack integration
-- interface from non-MS to MS
-    - e.g. translation from standard HTTP API to this message-based microservices api
-- auto-deploy microservices (for deployment to k8s)
 
 - refactor to make the code structure make more sense
     - update docs

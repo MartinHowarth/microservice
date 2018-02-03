@@ -3,75 +3,123 @@ import os
 import sys
 import time
 
+from collections import namedtuple
+
 from microservice.core import settings, communication
 
 logger = logging.getLogger(__name__)
 
 
-def microservice(func):
-    """
-    Decorator that replaces the function with the restful call to make.
-    """
-    def runtime_discovery(*args, __message=None, **kwargs):
-        # If this is called using args and kwargs, then this is being called to trigger a remote call
-        # If this is called using __message, then this has been called as part of dealing with an actor message
-        logger.debug("Decorator received call: {arguments}, {keyword_arguments}, {calling_message}", extra={
-            'arguments': args,
-            'keyword_arguments': kwargs,
-            'calling_message': __message,
-        })
+MicroserviceDefinition = namedtuple("MicroserviceDefinition", ["name", "exposed"])
 
-        module_name = sys.modules[func.__module__].__name__
 
-        if module_name == '__main__':
-            raise NotImplementedError("Can't have @microservice(s) defined in __main__ yet.")
-            module_name = os.path.splitext(os.path.dirname(sys.modules[func.__module__].__file__))[0]
-        service_name = "%s.%s" % (module_name, func.__name__)
+def service_name_from_func(func):
+    """
+    Work out the name of the microservice that corresponds to `func`.
+
+    :param function func: Function that is being turned into a microservice
+    :return str: Microservice name.
+    """
+    module_name = sys.modules[func.__module__].__name__
+    service_name = "%s.%s" % (module_name, func.__name__)
+    return service_name
+
+
+def microservice(method=None, exposed=False):
+    """
+    Decorator that declares a function as a microservice.
+    This handles both calling out to a remote microservice, and being called as a microservice.
+
+    Example usage:
+      @microservice
+      @microservice(exposed=True)
+
+    :param function method: The function to turn into a microservice.
+    :param bool exposed: Whether to expose this microservice outside of the microservice cluster.
+    """
+    def decorator(func):
+        if sys.modules[func.__module__].__name__ == '__main__':
+            # __main__ isn't static, so we can't ever allow a microservice to be defined in __main__ as other
+            # microservices won't be able to locate it reliably.
+            raise NotImplementedError("Can't have @microservice(s) defined in __main__.")
+
+        service_name = service_name_from_func(func)
         logger.debug("Function being decorated is: {full_service_name}", extra={'full_service_name': service_name})
 
-        if __message is not None:
-            args = __message.args
-            kwargs = __message.kwargs
+        # When first importing any microservice decorated functions, record the name of the service so that we can
+        # autodetect which services need to be created.
+        settings.all_microservices.append(
+            MicroserviceDefinition(service_name, exposed)
+        )
 
-        if (settings.deployment_mode == settings.DeploymentMode.ZERO or
-                service_name == settings.ServiceWaypost.local_service):
-            logger.info("{service_name} is being served locally.", extra={'service_name': service_name})
-            return func(*args, **kwargs)
+        def runtime_discovery(*args, __message=None, **kwargs):
+            # If this is called using args and kwargs, then this is being called to trigger a remote call
+            # If this is called using __message, then this has been called as part of dealing with an actor message
+            logger.debug(
+                "Decorator for {service_name} received call: {arguments}, {keyword_arguments}, {calling_message}",
+                extra={
+                    'service_name': service_name,
+                    'arguments': args,
+                    'keyword_arguments': kwargs,
+                    'calling_message': __message,
+                })
 
-        logger.info("{service_name} is being served remotely.", extra={'service_name': service_name})
-        # If we've already made the call to calculate this function, return that
-        if settings.communication_mode == settings.CommunicationMode.ACTOR and settings.current_message() is not None:
-            result_key = communication.create_result_key(service_name, args, kwargs)
-            if result_key in settings.current_message().results.keys():
-                result = settings.current_message().get_result(service_name, args, kwargs)
-                logger.info("Call to that function already carried out - returning previous result: {result}",
-                            extra={'result': result})
-                return result
+            # If there is no message, then we must be calling into this function from an interface.
+            # If there is a message, then this function is being called as a microservice.
+            if __message is not None:
+                args = __message.args
+                kwargs = __message.kwargs
 
-        logger.info("Result has not been previously calculated.")
-        if settings.communication_mode == settings.CommunicationMode.SYN:
-            logger.debug("CommunicationMode is synchronous: calculating result synchronously.")
-            ret_func = synchronous_function(service_name)
-            return ret_func(*args, **kwargs)
-        elif settings.communication_mode == settings.CommunicationMode.ACTOR:
-            # Otherwise, make a call to another actor to carry it out and stop processing.
-            logger.debug("CommunicationMode is asynchronous, sending request to another actor to fulfil request.")
-            if settings.current_message() is not None:
-                communication.construct_and_send_call_to_service(
-                    service_name,
-                    settings.current_message(),
-                    *args,
-                    **kwargs
-                )
-                raise communication.ServiceCallPerformed(service_name)
-            else:
-                # If there isn't an inbound microservice then we are making a call to a microservice from a
-                # non-microservice.
-                logger.info("Making call from interface, sending request, then waiting for async response back.")
-                return handle_interface_call(service_name, *args, **kwargs)
+            if (settings.deployment_mode == settings.DeploymentMode.ZERO or
+                    service_name == settings.ServiceWaypost.local_service):
+                logger.info("{service_name} is being served locally.", extra={'service_name': service_name})
+                return func(*args, **kwargs)
 
-        raise ValueError("Invalid communication_mode")
-    return runtime_discovery
+            logger.info("{service_name} is being served remotely.", extra={'service_name': service_name})
+            # If we've already made the call to calculate this function, return that
+            if (settings.communication_mode == settings.CommunicationMode.ACTOR and
+                    settings.current_message() is not None):
+                result_key = communication.create_result_key(service_name, args, kwargs)
+                if result_key in settings.current_message().results.keys():
+                    result = settings.current_message().get_result(service_name, args, kwargs)
+                    logger.info("Call to that function already carried out - returning previous result: {result}",
+                                extra={'result': result})
+                    return result
+
+            logger.info("Result has not been previously calculated.")
+            if settings.communication_mode == settings.CommunicationMode.SYN:
+                logger.debug("CommunicationMode is synchronous: calculating result synchronously.")
+                ret_func = synchronous_function(service_name)
+                return ret_func(*args, **kwargs)
+            elif settings.communication_mode == settings.CommunicationMode.ACTOR:
+                # Otherwise, make a call to another actor to carry it out and stop processing.
+                logger.debug("CommunicationMode is asynchronous, sending request to another actor to fulfil request.")
+                if settings.current_message() is not None:
+                    communication.construct_and_send_call_to_service(
+                        service_name,
+                        settings.current_message(),
+                        *args,
+                        **kwargs
+                    )
+                    raise communication.ServiceCallPerformed(service_name)
+                else:
+                    # If there isn't an inbound microservice then we are making a call to a microservice from a
+                    # non-microservice.
+                    logger.info("Making call from interface, sending request, then waiting for async response back.")
+                    return handle_interface_call(service_name, *args, **kwargs)
+
+            raise ValueError("Invalid communication_mode")
+        return runtime_discovery
+
+    # Handle whether this decorator was called with arguments or not.
+    if method is not None:
+        # This decorator was called without arguments: i.e. `@microservice`
+        # so we need to carry out the decoration, and return the new function
+        return decorator(method)
+
+    # Otherwise, this decorator was called with arguments: i.e. `@microservice(keyword=value)`
+    # so we need to construct the decorator based on those arguments, and return that.
+    return decorator
 
 
 def wait_for(condition, interval=0.01, timeout=60):
@@ -111,6 +159,7 @@ def handle_interface_call(service_name, *args, **kwargs):
             del settings.interface_results[new_message.request_id]
 
     if isinstance(result, Exception):
+        logger.exception(result)
         raise result
     return result
 

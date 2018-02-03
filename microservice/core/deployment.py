@@ -1,6 +1,6 @@
 import requests
-import threading
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict
 
 
@@ -54,14 +54,8 @@ class Deployment:
             )
             results[_service_nane] = response
 
-        thrds = []
-        for service_name in self.services.keys():
-            thrd = threading.Thread(target=make_request, args=(service_name,))
-            thrd.start()
-            thrds.append(thrd)
-
-        for thrd in thrds:
-            thrd.join()
+        with ThreadPoolExecutor() as executor:
+            executor.map(make_request, self.services.keys())
 
         return results
 
