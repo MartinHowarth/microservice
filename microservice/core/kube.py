@@ -1,17 +1,17 @@
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
-from microservice.core.settings import kube_namespace
+from microservice.core import settings
 
 
 kube_api_configuration = None
 
 
-def uri_for_service(service_name):
+def uri_for_service(service_name: str) -> str:
     kube_name = sanitise_name(service_name)
     uri = 'http://{kube_name}.{namespace}/'.format(
         kube_name=kube_name,
-        namespace=kube_namespace,
+        namespace=settings.kube_namespace,
     )
     return uri
 
@@ -35,7 +35,7 @@ def sanitise_name(name: str) -> str:
 
 
 class KubeMicroservice:
-    def __init__(self, name, exposed=False):
+    def __init__(self, name: str, exposed: bool=False):
         # This must match the container name
         self.raw_name = name
 
@@ -71,7 +71,7 @@ class KubeMicroservice:
     def create_service(self):
         try:
             self._service = self.api.create_namespaced_service(
-                namespace=kube_namespace,
+                namespace=settings.kube_namespace,
                 body=self.service_definition,
                 pretty=True,
             )
@@ -82,7 +82,7 @@ class KubeMicroservice:
             try:
                 self.api.patch_namespaced_service(
                     name=self.kube_name,
-                    namespace=kube_namespace,
+                    namespace=settings.kube_namespace,
                     body=self.service_definition,
                     pretty=True,
                 )
@@ -96,18 +96,18 @@ class KubeMicroservice:
     def create_deployment(self):
         try:
             self._deployment = self.api_beta1.create_namespaced_deployment(
-                namespace=kube_namespace,
+                namespace=settings.kube_namespace,
                 body=self.deployment_definition,
                 pretty=True,
             )
         except client.rest.ApiException as exp:
             if 'AlreadyExists' not in exp.body:
                 raise
-            print("Deployment {0} already exists - patching.".format(self.kube_name))
+            print("MicroserviceCluster {0} already exists - patching.".format(self.kube_name))
             try:
                 self.api_beta1.patch_namespaced_deployment(
                     name=self.kube_name,
-                    namespace=kube_namespace,
+                    namespace=settings.kube_namespace,
                     body=self.deployment_definition,
                     pretty=True,
                 )
@@ -121,7 +121,7 @@ class KubeMicroservice:
     def create_ingress(self):
         try:
             self._ingress = self.api_extensions_beta1.create_namespaced_ingress(
-                namespace=kube_namespace,
+                namespace=settings.kube_namespace,
                 body=self.ingress_definition,
                 pretty=True,
             )
@@ -131,7 +131,7 @@ class KubeMicroservice:
             print("Ingress {0} already exists - patching.".format(self.kube_name))
             self._ingress = self.api_extensions_beta1.patch_namespaced_ingress(
                 name=self.kube_name,
-                namespace=kube_namespace,
+                namespace=settings.kube_namespace,
                 body=self.ingress_definition,
                 pretty=True,
             )
@@ -139,7 +139,7 @@ class KubeMicroservice:
     def create_hpa(self):
         try:
             self._hpa = self.api_autoscaling.create_namespaced_horizontal_pod_autoscaler(
-                namespace=kube_namespace,
+                namespace=settings.kube_namespace,
                 body=self.hpa_definition,
                 pretty=True,
             )
@@ -149,7 +149,7 @@ class KubeMicroservice:
             print("HPA {0} already exists - patching.".format(self.kube_name))
             self._hpa = self.api_autoscaling.patch_namespaced_horizontal_pod_autoscaler(
                 name=self.kube_name,
-                namespace=kube_namespace,
+                namespace=settings.kube_namespace,
                 body=self.hpa_definition,
                 pretty=True,
             )
@@ -159,8 +159,8 @@ class KubeMicroservice:
         return client.AppsV1beta1Deployment(
             metadata=client.V1ObjectMeta(
                 name=self.kube_name,
-                namespace=kube_namespace,
-                labels={'pycroservice': kube_namespace},
+                namespace=settings.kube_namespace,
+                labels={'pycroservice': settings.kube_namespace},
             ),
             spec=client.AppsV1beta1DeploymentSpec(
                 replicas=1,
@@ -181,7 +181,7 @@ class KubeMicroservice:
         return client.V1Service(
                 metadata=client.V1ObjectMeta(
                     name=self.kube_name,
-                    namespace=kube_namespace,
+                    namespace=settings.kube_namespace,
                     labels={'microservice': self.kube_name}
                 ),
                 spec=client.V1ServiceSpec(
@@ -232,13 +232,13 @@ class KubeMicroservice:
         return client.V1HorizontalPodAutoscaler(
             metadata=client.V1ObjectMeta(
                 name=self.kube_name,
-                namespace=kube_namespace,
+                namespace=settings.kube_namespace,
             ),
             spec=client.V1HorizontalPodAutoscalerSpec(
                 min_replicas=1,
                 max_replicas=100,
                 scale_target_ref=client.V1CrossVersionObjectReference(
-                    kind="Deployment",
+                    kind="MicroserviceCluster",
                     name=self.kube_name,
                 ),
                 target_cpu_utilization_percentage=50,
@@ -264,14 +264,14 @@ def pycroservice_init():
     load_kube_config()
 
     api = client.CoreV1Api(client.ApiClient(config=kube_api_configuration))
-    if kube_namespace not in [ns.metadata.name for ns in api.list_namespace().items]:
-        print("Kube namespace {0} doesn't exist - creating...".format(kube_namespace))
+    if settings.kube_namespace not in [ns.metadata.name for ns in api.list_namespace().items]:
+        print("Kube namespace {0} doesn't exist - creating...".format(settings.kube_namespace))
         api.create_namespace(
             client.V1Namespace(
                 metadata={
-                    'name': kube_namespace,
+                    'name': settings.kube_namespace,
                 }
             ),
             pretty=True,
         )
-        print("Kube namespace {0} created".format(kube_namespace))
+        print("Kube namespace {0} created".format(settings.kube_namespace))

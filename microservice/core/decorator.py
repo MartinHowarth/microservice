@@ -1,28 +1,14 @@
 import logging
-import os
 import sys
-import time
 
 from collections import namedtuple
 
-from microservice.core import settings, communication
+from microservice.core import settings, communication, utils
 
 logger = logging.getLogger(__name__)
 
 
 MicroserviceDefinition = namedtuple("MicroserviceDefinition", ["name", "exposed"])
-
-
-def service_name_from_func(func):
-    """
-    Work out the name of the microservice that corresponds to `func`.
-
-    :param function func: Function that is being turned into a microservice
-    :return str: Microservice name.
-    """
-    module_name = sys.modules[func.__module__].__name__
-    service_name = "%s.%s" % (module_name, func.__name__)
-    return service_name
 
 
 def microservice(method=None, exposed=False):
@@ -43,7 +29,7 @@ def microservice(method=None, exposed=False):
             # microservices won't be able to locate it reliably.
             raise NotImplementedError("Can't have @microservice(s) defined in __main__.")
 
-        service_name = service_name_from_func(func)
+        service_name = utils.service_name_from_func(func)
         logger.debug("Function being decorated is: {full_service_name}", extra={'full_service_name': service_name})
 
         # When first importing any microservice decorated functions, record the name of the service so that we can
@@ -122,15 +108,6 @@ def microservice(method=None, exposed=False):
     return decorator
 
 
-def wait_for(condition, interval=0.01, timeout=60):
-    timer = 0
-    while not condition():
-        time.sleep(interval)
-        timer += interval
-        if timer > timeout:
-            raise TimeoutError("Timeout waiting for condition %s" % condition)
-
-
 def handle_interface_call(service_name, *args, **kwargs):
     new_message = communication.Message()
 
@@ -151,7 +128,7 @@ def handle_interface_call(service_name, *args, **kwargs):
         return new_message.request_id in settings.interface_results.keys()
 
     try:
-        wait_for(answer_is_ready)
+        utils.wait_for(answer_is_ready)
         logger.debug("Got response to request_id: {request_id}", extra={'request_id': new_message.request_id})
         result = settings.interface_results[new_message.request_id]
     finally:
@@ -167,11 +144,12 @@ def handle_interface_call(service_name, *args, **kwargs):
 def synchronous_function(service_name):
     if settings.deployment_mode == settings.DeploymentMode.ZERO:
         logger.info("Deployment mode is ZERO, so calculating result locally")
-        func_name = service_name.split('.')[-1]
-        mod_name = '.'.join(service_name.split('.')[:-1])
-        mod = __import__(mod_name, globals(), locals(), [func_name], 0)
-        func = getattr(mod, func_name)
-        return func
+        return utils.func_from_service_name(service_name)
+        # func_name = service_name.split('.')[-1]
+        # mod_name = '.'.join(service_name.split('.')[:-1])
+        # mod = __import__(mod_name, globals(), locals(), [func_name], 0)
+        # func = getattr(mod, func_name)
+        # return func
     else:
         # Wrapper to call the uri (i.e. remote function)
         def ms_function(*args, **kwargs):

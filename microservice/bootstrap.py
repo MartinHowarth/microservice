@@ -1,6 +1,6 @@
 from typing import List
 
-from microservice.core import dockr, kube
+from microservice.core import dockr, kube, settings
 
 
 def detect_all_services() -> List[kube.KubeMicroservice]:
@@ -38,15 +38,18 @@ def detect_all_services() -> List[kube.KubeMicroservice]:
 
 
 def main():
-    all_services = detect_all_services()
-
     # Create all the required docker images
-    dockr.build_all_images([service.raw_name for service in all_services])
+    dockr.build_all_images([service.name for service in settings.all_microservices])
+
+    k8s_services = [
+        kube.KubeMicroservice(service.name, service.exposed)
+        for service in settings.all_microservices
+    ]
 
     # Build up the k8s deployment
-    # kube.pycroservice_init()
-    # for service in all_services:
-    #     service.deploy()
+    kube.pycroservice_init()
+    for service in k8s_services:
+        service.deploy()
 
 
 if __name__ == "__main__":

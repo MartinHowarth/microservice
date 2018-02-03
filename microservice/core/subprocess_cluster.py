@@ -13,7 +13,7 @@ from setuptools.command.install import install
 from typing import List, Dict
 
 from microservice.core import settings
-from microservice.core.deployment import Deployment
+from microservice.core.microservice_cluster import MicroserviceCluster
 
 DETACHED_PROCESS = 8
 
@@ -49,7 +49,7 @@ def get_microservice_main_entrypoint_path():
 
     :return: The path to the main entrypoint of the microservice package.
     """
-    # TODO: This probably doesn't support virtualenvs properly.
+    # TODO: This doesn't support virtualenvs
     if is_windows():
         return os.path.join(get_setuptools_script_dir(), 'microservice.exe')
     else:
@@ -75,15 +75,15 @@ def uri_from_subprocess_service(subprocess_service):
     return "http://{}:{}/".format(subprocess_service.host, subprocess_service.port)
 
 
-class SubprocessDeployment(Deployment):
+class SubprocessMicroserviceCluster(MicroserviceCluster):
     deployment_mode = settings.DeploymentMode.SUBPROCESS
     next_port = 10000
 
     deployment_manager_host = '127.0.0.1'
     deployment_manager_port = 9999
 
-    def __init__(self, service_names: List[str]):
-        super(SubprocessDeployment, self).__init__(service_names)
+    def __init__(self, *args, **kwargs):
+        super(SubprocessMicroserviceCluster, self).__init__(*args, **kwargs)
         self.host = "127.0.0.1"
         self.services = {}  # type: Dict[str, SubprocessService]
         self.deployment_manager_thread = None
@@ -91,12 +91,12 @@ class SubprocessDeployment(Deployment):
         self.deployment_manager_uri = 'http://{}:{}/'.format(self.deployment_manager_host, self.deployment_manager_port)
 
     def setup(self):
-        super(SubprocessDeployment, self).setup()
+        super(SubprocessMicroserviceCluster, self).setup()
         self.create_deployment_manager()
         self.set_deployment_manager_uri()
 
     def teardown(self):
-        super(SubprocessDeployment, self).teardown()
+        super(SubprocessMicroserviceCluster, self).teardown()
         requests.get(self.deployment_manager_uri + 'terminate')
         self.deployment_manager_thread.join()
 

@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify
 
-from microservice.core import settings, communication
+from microservice.core import settings, communication, utils
 
 logger = logging.getLogger(__name__)
 
@@ -174,12 +174,7 @@ def add_local_service(service_name, no_local_function=False):
         logger.info("No local function set - this is likely an MS to non-MS interface handler.")
         settings.ServiceWaypost.local_function = handle_interface_callback
     else:
-        func_name = service_name.split('.')[-1]
-        mod_name = '.'.join(service_name.split('.')[:-1])
-        mod = __import__(mod_name, globals(), locals(), [func_name], 0)
-        func = getattr(mod, func_name)
-        logger.debug("Dynamically found module is: {mod}", extra={'mod': mod})
-        logger.debug("Dynamically found function is: {func}", extra={'func': func})
+        func = utils.func_from_service_name(service_name)
         settings.ServiceWaypost.local_function = func
 
 

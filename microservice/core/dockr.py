@@ -3,8 +3,6 @@ import docker
 from io import BytesIO
 from typing import List
 
-client = docker.from_env()
-
 
 base_dockerfile = """
 FROM python:3
@@ -32,6 +30,7 @@ def build_image(dockerfile: str, tag: str, **kwargs) -> None:
     :param tag:
     :return:
     """
+    client = docker.from_env()
     fobj = BytesIO(dockerfile.encode('utf-8'))
     build = client.api.build(
         path="./",

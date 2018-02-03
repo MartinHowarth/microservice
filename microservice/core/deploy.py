@@ -1,16 +1,17 @@
 from typing import List
 
 from microservice.core import settings
-from microservice.core.subprocess_deployment import SubprocessDeployment
+from microservice.core.subprocess_cluster import SubprocessMicroserviceCluster
+from microservice.core.kubernetes_cluster import KubernetesMicroserviceCluster
 
 
-def create_deployment(microservice_names: List[str]):
+def create_deployment(microservice_names: List[str]=None):
     if settings.deployment_mode == settings.DeploymentMode.ZERO:
         return
     elif settings.deployment_mode == settings.DeploymentMode.SUBPROCESS:
-        settings.ServiceWaypost.deployment = SubprocessDeployment(microservice_names)
+        settings.ServiceWaypost.deployment = SubprocessMicroserviceCluster(microservice_names)
     elif settings.deployment_mode == settings.DeploymentMode.KUBERNETES:
-        raise NotImplementedError("not implemented")
+        settings.ServiceWaypost.deployment = KubernetesMicroserviceCluster(microservice_names)
 
     settings.ServiceWaypost.deployment.setup()
 

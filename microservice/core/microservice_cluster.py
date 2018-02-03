@@ -3,8 +3,10 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict
 
+from microservice.core import settings
 
-class Deployment:
+
+class MicroserviceCluster:
     """
     This controls deploying a set of microservices.
 
@@ -17,8 +19,26 @@ class Deployment:
     """
     deployment_mode = None
 
-    def __init__(self, service_names: List[str]):
+    def __init__(self, service_names: List[str]=None):
+        """
+        If `service_names` is None, then the service names are autodetected. This autodetection relies on
+        each of the microservices you want to create having been imported before you call this function.
+
+        Example usage:
+          import my_module_containing_microservices
+          import my_other_module_containing_microservices
+
+          import microservice
+          microservice.kube.deploy_all()
+
+        :param list[str] service_names: List of service names to deploy.
+            Each name is a dot-separated path to the function that is being defined as a microservice.
+            Defaults to trying to auto-detect the services.
+        """
         self.service_names = service_names
+        if self.service_names is None:
+            self.service_names = settings.all_microservices
+
         self.services = {}  # type: Dict[str, object] # Values of an object representing the service in some way.
 
     def __enter__(self):

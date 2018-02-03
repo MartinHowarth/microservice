@@ -1,10 +1,10 @@
-import enum
-import pickle
 import requests
 from time import sleep
 
-from microservice.core.communication import Message, send_object_to_service
-from microservice.core.subprocess_deployment import SubprocessDeployment
+from microservice.core.subprocess_cluster import SubprocessMicroserviceCluster
+
+# Import all the definitions of microservices that we want to use
+from microservice.tests import microservices_for_testing
 
 
 microservices = [
@@ -16,8 +16,8 @@ microservices = [
     'microservice.tests.microservices_for_testing.exception_raiser',
 ]
 
-
-with SubprocessDeployment(microservices) as depl:
+# with SubprocessMicroserviceCluster(microservices) as depl:
+with SubprocessMicroserviceCluster() as depl:
     print(depl.all_microservices_are_alive())
 
     resp = requests.get(depl.uri_for_service('microservice.tests.microservices_for_testing.exception_raiser') + 'echo')
@@ -27,5 +27,3 @@ with SubprocessDeployment(microservices) as depl:
     print([resp.text for resp in depl.send_request_to_all_services('deployment_manager_uri').values()])
 
     sleep(10)
-
-
