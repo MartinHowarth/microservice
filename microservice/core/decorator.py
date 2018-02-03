@@ -1,14 +1,9 @@
 import logging
 import sys
 
-from collections import namedtuple
-
 from microservice.core import settings, communication, utils
 
 logger = logging.getLogger(__name__)
-
-
-MicroserviceDefinition = namedtuple("MicroserviceDefinition", ["name", "exposed"])
 
 
 def microservice(method=None, exposed=False):
@@ -35,7 +30,7 @@ def microservice(method=None, exposed=False):
         # When first importing any microservice decorated functions, record the name of the service so that we can
         # autodetect which services need to be created.
         settings.all_microservices.append(
-            MicroserviceDefinition(service_name, exposed)
+            utils.MicroserviceDefinition(service_name, exposed)
         )
 
         def runtime_discovery(*args, __message=None, **kwargs):
@@ -136,7 +131,7 @@ def handle_interface_call(service_name, *args, **kwargs):
             del settings.interface_results[new_message.request_id]
 
     if isinstance(result, Exception):
-        logger.exception(result)
+        logger.exception("Microservice hit exception: {exception}", extra={'exception': result})
         raise result
     return result
 
@@ -145,11 +140,6 @@ def synchronous_function(service_name):
     if settings.deployment_mode == settings.DeploymentMode.ZERO:
         logger.info("Deployment mode is ZERO, so calculating result locally")
         return utils.func_from_service_name(service_name)
-        # func_name = service_name.split('.')[-1]
-        # mod_name = '.'.join(service_name.split('.')[:-1])
-        # mod = __import__(mod_name, globals(), locals(), [func_name], 0)
-        # func = getattr(mod, func_name)
-        # return func
     else:
         # Wrapper to call the uri (i.e. remote function)
         def ms_function(*args, **kwargs):

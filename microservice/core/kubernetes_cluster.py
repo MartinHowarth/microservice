@@ -10,11 +10,11 @@ class KubernetesMicroserviceCluster(MicroserviceCluster):
 
     def spawn_all_microservices(self):
         # Create all the required docker images
-        dockr.build_all_images([service.name for service in self.service_names])
+        dockr.build_all_images([service.name for service in self.service_definitions])
 
         k8s_services = [
             kube.KubeMicroservice(service.name, service.exposed)
-            for service in self.service_names
+            for service in self.service_definitions
         ]
 
         # Build up the k8s deployment

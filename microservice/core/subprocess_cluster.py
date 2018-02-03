@@ -132,11 +132,11 @@ class SubprocessMicroserviceCluster(MicroserviceCluster):
         return uri_from_subprocess_service(self.services[service_name])
 
     def spawn_all_microservices(self):
-        for service_name in self.service_names:
+        for service_definition in self.service_definitions:
             port = self.next_port
             self.next_port += 1
-            process = spawn_microservice(service_name, self.host, port)
-            self.services[service_name] = SubprocessService(process, self.host, port)
+            process = spawn_microservice(service_definition.name, self.host, port)
+            self.services[service_definition.name] = SubprocessService(process, self.host, port)
 
         # Sleep to allow the microservices to initialise. Could be replaced with an active poller, but not worth the
         # effort for the test-only subprocess deployment.

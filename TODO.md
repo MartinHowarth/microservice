@@ -8,10 +8,6 @@ Learn and improve!
 ## featurelist
 
 ### next up
-- automatic microservice discovery
-    - Easy one is to import (and require import) of all modules where an MS is defined
-    - is there a better way?
-
 - test interface in:
     - zero mode
     - synchronous mode
@@ -20,6 +16,11 @@ Learn and improve!
     - works when run manually
     - add automatic checks
     - thread locals are working (no bleeding over of requests)
+
+- test k8s integration / auto deployment
+
+- support multiple ingress' in k8s
+    - Can't remember why this isn't supported, but my earlier comments said it doesn't...
 
 - improve settings
     - improve idempotency for tests

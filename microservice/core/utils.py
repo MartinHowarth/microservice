@@ -1,6 +1,7 @@
 import logging
 import sys
 import time
+from collections import namedtuple
 
 logger = logging.getLogger(__name__)
 
@@ -40,3 +41,6 @@ def wait_for(condition: callable, interval: float=0.01, timeout: int=60):
         timer += interval
         if timer > timeout:
             raise TimeoutError("Timeout waiting for condition %s" % condition)
+
+
+MicroserviceDefinition = namedtuple("MicroserviceDefinition", ["name", "exposed"])
